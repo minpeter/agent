@@ -1,6 +1,7 @@
 import type { Interface as ReadlineInterface } from "node:readline";
-import type { LanguageModel } from "ai";
+import type { LanguageModel, ModelMessage } from "ai";
 import type { Agent } from "../agent";
+import { SYSTEM_PROMPT } from "../prompts/system";
 import { colorize } from "../utils/colors";
 import {
   deleteConversation,
@@ -9,6 +10,83 @@ import {
   saveConversation,
 } from "../utils/conversation-store";
 import { selectModel } from "../utils/model-selector";
+
+interface RenderAPIMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  name?: string;
+  tool_calls?: Array<{
+    id: string;
+    type: "function";
+    function: { name: string; arguments: string };
+  }>;
+  tool_call_id?: string;
+}
+
+function convertToRenderAPIMessages(
+  messages: ModelMessage[],
+  systemPrompt: string
+): RenderAPIMessage[] {
+  const result: RenderAPIMessage[] = [
+    { role: "system", content: systemPrompt },
+  ];
+
+  for (const msg of messages) {
+    if (msg.role === "user") {
+      const content = Array.isArray(msg.content)
+        ? msg.content
+            .filter((p) => p.type === "text")
+            .map((p) => p.text)
+            .join("")
+        : msg.content;
+      result.push({ role: "user", content });
+    } else if (msg.role === "assistant") {
+      const textParts = Array.isArray(msg.content)
+        ? msg.content.filter((p) => p.type === "text")
+        : [];
+      const toolCallParts = Array.isArray(msg.content)
+        ? msg.content.filter((p) => p.type === "tool-call")
+        : [];
+
+      const content =
+        textParts.length > 0
+          ? textParts.map((p) => p.text).join("")
+          : toolCallParts.length > 0
+            ? null
+            : "";
+
+      const assistantMsg: RenderAPIMessage = { role: "assistant", content };
+
+      if (toolCallParts.length > 0) {
+        assistantMsg.tool_calls = toolCallParts.map((tc) => ({
+          id: tc.toolCallId,
+          type: "function" as const,
+          function: {
+            name: tc.toolName,
+            arguments: JSON.stringify(tc.input),
+          },
+        }));
+      }
+
+      result.push(assistantMsg);
+    } else if (msg.role === "tool") {
+      for (const part of msg.content) {
+        if (part.type === "tool-result") {
+          result.push({
+            role: "tool",
+            content:
+              typeof part.output === "string"
+                ? part.output
+                : JSON.stringify(part.output),
+            tool_call_id: part.toolCallId,
+          });
+        }
+      }
+    }
+  }
+
+  return result;
+}
 
 export interface CommandContext {
   agent: Agent;
@@ -38,6 +116,7 @@ ${colorize("cyan", "Available commands:")}
   /list              - List all saved conversations
   /delete <id>       - Delete a saved conversation
   /models            - List and select available AI models
+  /render            - Render conversation as raw prompt text
   /quit              - Exit the program
 `);
 }
@@ -152,6 +231,51 @@ async function handleModels(
   return { conversationId: ctx.currentConversationId };
 }
 
+async function handleRender(
+  _args: string[],
+  ctx: CommandContext
+): Promise<CommandResult> {
+  const messages = ctx.agent.getConversation();
+  if (messages.length === 0) {
+    console.log(colorize("yellow", "No conversation to render."));
+    return { conversationId: ctx.currentConversationId };
+  }
+
+  const apiMessages = convertToRenderAPIMessages(messages, SYSTEM_PROMPT);
+
+  try {
+    const response = await fetch(
+      "https://api.friendli.ai/serverless/v1/chat/render",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.FRIENDLI_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: ctx.currentModelId,
+          messages: apiMessages,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.log(colorize("red", `Render failed: ${error}`));
+      return { conversationId: ctx.currentConversationId };
+    }
+
+    const data = (await response.json()) as { text: string };
+    console.log(colorize("cyan", "=== Rendered Prompt ==="));
+    console.log(data.text);
+    console.log(colorize("cyan", "======================="));
+  } catch (error) {
+    console.log(colorize("red", `Error: ${error}`));
+  }
+
+  return { conversationId: ctx.currentConversationId };
+}
+
 const commands: Record<string, CommandHandler> = {
   help: handleHelp,
   clear: handleClear,
@@ -162,6 +286,7 @@ const commands: Record<string, CommandHandler> = {
   quit: handleQuit,
   exit: handleQuit,
   models: handleModels,
+  render: handleRender,
 };
 
 export function handleCommand(
