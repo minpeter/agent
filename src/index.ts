@@ -12,6 +12,7 @@ const DEFAULT_MODEL_ID = "LGAI-EXAONE/K-EXAONE-236B-A23B";
 
 const friendli = createFriendli({
   apiKey: env.FRIENDLI_TOKEN,
+  includeUsage: true,
 });
 
 let currentModelId = DEFAULT_MODEL_ID;

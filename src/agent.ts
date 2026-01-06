@@ -10,6 +10,7 @@ import { SYSTEM_PROMPT } from "./prompts/system";
 import type { tools } from "./tools/index";
 import { tools as agentTools } from "./tools/index";
 import {
+  colorize,
   printAIPrefix,
   printChunk,
   printNewline,
@@ -18,6 +19,12 @@ import {
   printReasoningPrefix,
   printTool,
 } from "./utils/colors";
+import { compactConversation } from "./utils/context-compactor";
+import {
+  type ContextConfig,
+  type ContextStats,
+  ContextTracker,
+} from "./utils/context-tracker";
 import { withRetry } from "./utils/retry";
 
 type StreamChunk = TextStreamPart<typeof tools>;
@@ -94,14 +101,24 @@ function logDebugFinish(chunk: StreamChunk): void {
 
 const DEFAULT_MAX_STEPS = 255;
 
+export interface AgentConfig {
+  maxSteps?: number;
+  contextConfig?: Partial<ContextConfig>;
+  autoCompact?: boolean;
+}
+
 export class Agent {
   private model: LanguageModel;
   private conversation: ModelMessage[] = [];
   private readonly maxSteps: number;
+  private readonly contextTracker: ContextTracker;
+  private readonly autoCompact: boolean;
 
-  constructor(model: LanguageModel, maxSteps = DEFAULT_MAX_STEPS) {
+  constructor(model: LanguageModel, config: AgentConfig = {}) {
     this.model = model;
-    this.maxSteps = maxSteps;
+    this.maxSteps = config.maxSteps ?? DEFAULT_MAX_STEPS;
+    this.contextTracker = new ContextTracker(config.contextConfig);
+    this.autoCompact = config.autoCompact ?? true;
   }
 
   getModel(): LanguageModel {
@@ -122,9 +139,47 @@ export class Agent {
 
   clearConversation(): void {
     this.conversation = [];
+    this.contextTracker.reset();
+  }
+
+  /**
+   * Set the maximum context tokens for the current model
+   */
+  setMaxContextTokens(tokens: number): void {
+    this.contextTracker.setMaxContextTokens(tokens);
+  }
+
+  /**
+   * Set the compaction threshold (0.0 - 1.0)
+   */
+  setCompactionThreshold(threshold: number): void {
+    this.contextTracker.setCompactionThreshold(threshold);
+  }
+
+  /**
+   * Get current context usage statistics
+   */
+  getContextStats(): ContextStats {
+    return this.contextTracker.getStats();
+  }
+
+  /**
+   * Manually trigger context compaction
+   */
+  async compactContext(): Promise<void> {
+    const result = await compactConversation(this.model, this.conversation);
+    this.conversation = result.messages;
+    // Estimate new token count (rough approximation)
+    const estimatedTokens = result.summary.length / 4; // ~4 chars per token
+    this.contextTracker.afterCompaction(estimatedTokens);
   }
 
   async chat(userInput: string): Promise<void> {
+    // Check if compaction is needed before processing
+    if (this.autoCompact && this.contextTracker.shouldCompact()) {
+      await this.compactContext();
+    }
+
     this.conversation.push({
       role: "user",
       content: userInput,
@@ -133,6 +188,11 @@ export class Agent {
     await withRetry(async () => {
       await this.executeStreamingChat();
     });
+
+    // Check again after response
+    if (this.autoCompact && this.contextTracker.shouldCompact()) {
+      await this.compactContext();
+    }
   }
 
   private async executeStreamingChat(): Promise<void> {
@@ -178,6 +238,23 @@ export class Agent {
     endTextIfNeeded(state);
 
     const response = await result.response;
+
+    // Update context tracker with usage information
+    const totalUsage = await result.totalUsage;
+    if (totalUsage) {
+      this.contextTracker.updateUsage(totalUsage);
+
+      if (debug) {
+        const stats = this.contextTracker.getStats();
+        console.log(
+          colorize(
+            "dim",
+            `[Context] ${stats.totalTokens.toLocaleString()} / ${stats.maxContextTokens.toLocaleString()} tokens (${(stats.usagePercentage * 100).toFixed(1)}%)`
+          )
+        );
+      }
+    }
+
     if (debug) {
       console.log(`[DEBUG] Total chunks: ${chunkCount}`);
       console.log(`[DEBUG] Response messages: ${response.messages.length}`);
