@@ -1,15 +1,14 @@
-// Command execution tool
-import { runCommandTool } from "./command/run-command";
-
 // File manipulation tools
 import { deleteFileTool } from "./file/delete-file";
 import { editFileTool } from "./file/edit-file";
 import { readFileTool } from "./file/read-file";
 import { writeFileTool } from "./file/write-file";
-
 // File search tools
 import { globTool } from "./search/glob";
 import { grepTool } from "./search/grep";
+
+// Command execution tool
+import { runCommandTool } from "./shell/run-command";
 
 export const tools = {
   // Command execution
