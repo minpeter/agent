@@ -7,3 +7,5 @@ dist/
 # tbranch artifact
 jobs
 __pycache__
+
+.sisyphus

@@ -30,6 +30,7 @@ const disableApprovalForTools = <T extends Record<string, unknown>>(
 
 interface CreateAgentOptions {
   disableApproval?: boolean;
+  instructions?: string;
 }
 
 const createAgent = (modelId: string, options: CreateAgentOptions = {}) =>
@@ -38,7 +39,7 @@ const createAgent = (modelId: string, options: CreateAgentOptions = {}) =>
       model: friendli(modelId),
       middleware: trimLeadingNewlinesMiddleware,
     }),
-    instructions: SYSTEM_PROMPT,
+    instructions: options.instructions || SYSTEM_PROMPT,
     tools: options.disableApproval ? disableApprovalForTools(tools) : tools,
     maxOutputTokens: OUTPUT_TOKEN_MAX,
     providerOptions: {
@@ -49,6 +50,25 @@ const createAgent = (modelId: string, options: CreateAgentOptions = {}) =>
       },
     },
   });
+
+const getEnvironmentContext = (): string => {
+  const cwd = process.cwd();
+  const user = process.env.USER || process.env.USERNAME || "unknown";
+  const home = process.env.HOME || process.env.USERPROFILE || "";
+
+  return `
+
+## Current Environment
+- Working Directory: ${cwd}
+- User: ${user}
+- Home: ${home}
+
+## File Path Guidelines
+- Use absolute paths when the task specifies them (e.g., if task says "/app/output.txt", use exactly that)
+- The current working directory is "${cwd}"
+- When writing files, prefer absolute paths to avoid ambiguity
+- If you see a path like "${cwd}/file.txt" in task instructions, use that exact path`;
+};
 
 class AgentManager {
   private modelId: string = DEFAULT_MODEL_ID;
@@ -71,6 +91,9 @@ class AgentManager {
   }
 
   getInstructions(): string {
+    if (this.headlessMode) {
+      return SYSTEM_PROMPT + getEnvironmentContext();
+    }
     return SYSTEM_PROMPT;
   }
 
@@ -81,6 +104,7 @@ class AgentManager {
   stream(messages: ModelMessage[]) {
     const agent = createAgent(this.modelId, {
       disableApproval: this.headlessMode,
+      instructions: this.getInstructions(),
     });
     return agent.stream({ messages });
   }

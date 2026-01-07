@@ -6,6 +6,7 @@ import { z } from "zod";
 export const writeFileTool = tool({
   description:
     "Write content to a file, creating it if it doesn't exist or overwriting if it does. " +
+    "Supports both absolute paths (e.g., /app/file.txt) and relative paths. " +
     "Parent directories will be created automatically if needed. " +
     "Use this for creating new files or completely replacing file contents.",
   needsApproval: true,

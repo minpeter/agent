@@ -4,15 +4,16 @@ import { safeReadFile } from "./safety-utils";
 
 export const readFileTool = tool({
   description:
-    "Read the contents of a given relative file path. " +
+    "Read the contents of a file. " +
     "Use this when you want to see what's inside a file. " +
+    "Supports both absolute paths (e.g., /app/file.txt) and relative paths. " +
     "Do not use this with directory names. " +
     "Files in .gitignore, binary files, and files over 1MB will be rejected. " +
     "Supports pagination with offset and limit for large files.",
   inputSchema: z.object({
     path: z
       .string()
-      .describe("The relative path of a file in the working directory."),
+      .describe("The file path (absolute like /app/file.txt or relative)."),
     offset: z
       .number()
       .optional()
