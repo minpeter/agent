@@ -11,6 +11,7 @@ export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
 echo "Cloning code-editing-agent..."
+rm -rf /app
 git clone --depth 1 https://github.com/minpeter/agent.git /app
 cd /app
 bun install
