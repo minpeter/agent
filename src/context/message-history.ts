@@ -1,4 +1,40 @@
-import type { ModelMessage } from "ai";
+import type { ModelMessage, TextPart } from "ai";
+
+function trimTrailingNewlines(message: ModelMessage): ModelMessage {
+  if (message.role !== "assistant") {
+    return message;
+  }
+
+  const content = message.content;
+
+  if (typeof content === "string") {
+    const trimmed = content.replace(/\n+$/, "");
+    if (trimmed === content) {
+      return message;
+    }
+    return { ...message, content: trimmed };
+  }
+
+  if (!Array.isArray(content) || content.length === 0) {
+    return message;
+  }
+
+  const lastPart = content[content.length - 1];
+  if (lastPart.type !== "text") {
+    return message;
+  }
+
+  const trimmedText = (lastPart as TextPart).text.replace(/\n+$/, "");
+  if (trimmedText === (lastPart as TextPart).text) {
+    return message;
+  }
+
+  const newContent = [
+    ...content.slice(0, -1),
+    { ...lastPart, text: trimmedText },
+  ];
+  return { ...message, content: newContent };
+}
 
 export interface Message {
   id: string;
@@ -44,7 +80,7 @@ export class MessageHistory {
       const message: Message = {
         id: createMessageId(),
         createdAt: new Date(),
-        modelMessage,
+        modelMessage: trimTrailingNewlines(modelMessage),
       };
       created.push(message);
     }
