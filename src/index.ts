@@ -15,6 +15,12 @@ import {
 
 const messageHistory = new MessageHistory();
 
+const TOOL_DENIAL_GUIDANCE =
+  "Consider: 1) Find alternative approaches that don't require these tools, 2) Ask the user why they denied them, or 3) Reflect on whether you misunderstood the task.";
+
+const createDenialReason = (toolNames: string): string =>
+  `User denied the following tools: ${toolNames}. ${TOOL_DENIAL_GUIDANCE}`;
+
 registerCommand(
   createRenderCommand(() => ({
     model: agentManager.getModelId(),
@@ -98,7 +104,9 @@ const askSingleApproval = async (
     type: "tool-approval-response",
     approvalId,
     approved,
-    reason: approved ? "User approved" : "User denied",
+    reason: approved
+      ? "User approved"
+      : createDenialReason(`"${toolCall.toolName}"`),
   };
 };
 
@@ -125,11 +133,14 @@ const askBatchApproval = async (
   }
 
   if (answer === "n") {
+    const toolNames = requests
+      .map((r) => `"${r.toolCall.toolName}"`)
+      .join(", ");
     return requests.map((req) => ({
       type: "tool-approval-response" as const,
       approvalId: req.approvalId,
       approved: false,
-      reason: "User denied all",
+      reason: createDenialReason(toolNames),
     }));
   }
 
@@ -153,11 +164,12 @@ const askBatchApproval = async (
     return approvals;
   }
 
+  const toolNames = requests.map((r) => `"${r.toolCall.toolName}"`).join(", ");
   return requests.map((req) => ({
     type: "tool-approval-response" as const,
     approvalId: req.approvalId,
     approved: false,
-    reason: "Invalid input - denied",
+    reason: createDenialReason(toolNames),
   }));
 };
 

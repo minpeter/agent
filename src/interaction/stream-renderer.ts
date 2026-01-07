@@ -6,7 +6,6 @@ import { env } from "../env";
 export interface StreamRenderOptions {
   output?: Writable;
   showReasoning?: boolean;
-  showToolInput?: boolean;
   showSteps?: boolean;
   showFinishReason?: boolean;
   showSources?: boolean;
@@ -14,12 +13,11 @@ export interface StreamRenderOptions {
   useColor?: boolean;
 }
 
-type StreamMode = "text" | "reasoning" | "tool-input" | "none";
+type StreamMode = "text" | "reasoning" | "none";
 
 interface RenderContext {
   output: Writable;
   showReasoning: boolean;
-  showToolInput: boolean;
   showSteps: boolean;
   showFinishReason: boolean;
   showSources: boolean;
@@ -138,37 +136,6 @@ const handleReasoningEnd = (ctx: RenderContext): StreamMode => {
     return "none";
   }
   write(ctx, renderReasoningEnd(ctx));
-  writeLine(ctx);
-  return "none";
-};
-
-const handleToolInputStart = (
-  ctx: RenderContext,
-  part: Extract<StreamPart, { type: "tool-input-start" }>
-): StreamMode => {
-  if (!ctx.showToolInput) {
-    return "none";
-  }
-  writeLine(ctx);
-  writeLine(ctx, `${renderToolLabel(ctx)} ${part.toolName} (${part.id})`);
-  return "tool-input";
-};
-
-const handleToolInputDelta = (
-  ctx: RenderContext,
-  part: Extract<StreamPart, { type: "tool-input-delta" }>
-): StreamMode => {
-  if (!ctx.showToolInput) {
-    return "none";
-  }
-  write(ctx, part.delta);
-  return "tool-input";
-};
-
-const handleToolInputEnd = (ctx: RenderContext): StreamMode => {
-  if (!ctx.showToolInput) {
-    return "none";
-  }
   writeLine(ctx);
   return "none";
 };
@@ -314,7 +281,6 @@ export const renderFullStream = async <TOOLS extends ToolSet>(
   const ctx: RenderContext = {
     output: options.output ?? process.stdout,
     showReasoning: options.showReasoning ?? true,
-    showToolInput: options.showToolInput ?? true,
     showSteps: options.showSteps ?? false,
     showFinishReason: options.showFinishReason ?? env.DEBUG_SHOW_FINISH_REASON,
     showSources: options.showSources ?? true,
@@ -347,13 +313,8 @@ export const renderFullStream = async <TOOLS extends ToolSet>(
         mode = handleReasoningEnd(ctx);
         break;
       case "tool-input-start":
-        mode = handleToolInputStart(ctx, part);
-        break;
       case "tool-input-delta":
-        mode = handleToolInputDelta(ctx, part);
-        break;
       case "tool-input-end":
-        mode = handleToolInputEnd(ctx);
         break;
       case "tool-call":
         mode = handleToolCall(ctx, part);
