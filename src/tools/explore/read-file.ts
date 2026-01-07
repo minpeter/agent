@@ -1,6 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { safeReadFile } from "./file-safety";
+import { safeReadFile } from "./safety-utils";
 
 export const readFileTool = tool({
   description:

@@ -51,7 +51,7 @@ function trimTrailingNewlines(
 const toolCallPart: ToolCallPart = {
   type: "tool-call",
   toolCallId: "call_123",
-  toolName: "run_command",
+  toolName: "shell_command",
   input: { command: 'git commit -m "test"' },
 };
 

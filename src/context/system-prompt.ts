@@ -5,7 +5,7 @@ You have access to the following tools:
 - **read_file**: Read the contents of a file
 - **list_files**: List files and directories (respects .gitignore)
 - **edit_file**: Edit files by replacing text, or create new files
-- **run_command**: Execute safe shell commands
+- **shell_command**: Execute shell commands (requires approval)
 
 ## Guidelines
 

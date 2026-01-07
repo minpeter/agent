@@ -2,7 +2,7 @@ import { stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tool } from "ai";
 import { z } from "zod";
-import { getIgnoreFilter } from "../file/file-safety";
+import { getIgnoreFilter } from "./safety-utils";
 
 interface FileWithMtime {
   path: string;

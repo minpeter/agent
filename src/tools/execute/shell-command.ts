@@ -28,7 +28,7 @@ class CommandError extends Error {
   }
 }
 
-export const runCommandTool = tool({
+export const shellCommandTool = tool({
   description: "Execute a shell command and return the output",
   inputSchema: z.object({
     command: z
