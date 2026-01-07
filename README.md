@@ -87,11 +87,7 @@ You: /help
 Available commands:
   /help              - Show this help message
   /clear             - Clear current conversation
-  /save              - Save current conversation
-  /load <id>         - Load a saved conversation
-  /list              - List all saved conversations
-  /delete <id>       - Delete a saved conversation
-  /models            - List and select available AI models
+  /model             - Show and select available AI models
   /render            - Render conversation as raw prompt text
   /quit              - Exit the program
 
@@ -132,7 +128,7 @@ code-editing-agent/
 
 ## Model
 
-Uses `LGAI-EXAONE/K-EXAONE-236B-A23B` via FriendliAI serverless endpoints by default. Use `/models` command to switch models.
+Uses `LGAI-EXAONE/K-EXAONE-236B-A23B` via FriendliAI serverless endpoints by default. Use `/model` command to switch models.
 
 ## License
 
