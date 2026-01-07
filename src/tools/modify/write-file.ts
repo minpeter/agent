@@ -8,6 +8,7 @@ export const writeFileTool = tool({
     "Write content to a file, creating it if it doesn't exist or overwriting if it does. " +
     "Parent directories will be created automatically if needed. " +
     "Use this for creating new files or completely replacing file contents.",
+  needsApproval: true,
   inputSchema: z.object({
     path: z.string().describe("The path to the file to write."),
     content: z.string().describe("The content to write to the file."),

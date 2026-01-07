@@ -29,6 +29,7 @@ export const editFileTool = tool({
     "'old_str' and 'new_str' MUST be different from each other.\n" +
     "Use 'replace_all: true' to replace all occurrences.\n\n" +
     "If the file specified with path doesn't exist, it will be created.",
+  needsApproval: true,
   inputSchema,
   execute: async ({
     path,

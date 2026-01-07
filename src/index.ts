@@ -1,91 +1,79 @@
-#!/usr/bin/env bun
-import { createInterface } from "node:readline";
-import { createFriendli } from "@friendliai/ai-provider";
-import type { LanguageModel } from "ai";
-import { Agent } from "./agent";
-import { handleCommand } from "./commands";
-import { env } from "./env";
-import { wrapModel } from "./model/create-model";
-import { printYou } from "./utils/colors";
+import type { Interface } from "node:readline/promises";
+import { createInterface } from "node:readline/promises";
+import { agentManager } from "./agent";
+import { executeCommand, isCommand, registerCommand } from "./commands";
+import { createClearCommand } from "./commands/clear";
+import { createModelCommand } from "./commands/model";
+import { createRenderCommand } from "./commands/render";
+import { MessageHistory } from "./context/message-history";
+import { renderFullStream } from "./interaction/stream-renderer";
+import { askBatchApproval } from "./interaction/tool-approval";
 
-const DEFAULT_MODEL_ID = "LGAI-EXAONE/K-EXAONE-236B-A23B";
+const messageHistory = new MessageHistory();
 
-const friendli = createFriendli({
-  apiKey: env.FRIENDLI_TOKEN,
-});
+registerCommand(
+  createRenderCommand(() => ({
+    model: agentManager.getModelId(),
+    instructions: agentManager.getInstructions(),
+    tools: agentManager.getTools(),
+    messages: messageHistory.toModelMessages(),
+  }))
+);
+registerCommand(createModelCommand());
+registerCommand(createClearCommand(messageHistory));
 
-let currentModelId = DEFAULT_MODEL_ID;
-const agent = new Agent(wrapModel(friendli(currentModelId)));
-let currentConversationId: string | undefined;
-
-const rl = createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
-
-function getUserInput(): Promise<string | null> {
-  return new Promise((resolve) => {
-    printYou();
-    rl.once("line", (line) => {
-      resolve(line);
-    });
-    rl.once("close", () => {
-      resolve(null);
-    });
+const processAgentResponse = async (rl: Interface): Promise<void> => {
+  const stream = await agentManager.stream(messageHistory.toModelMessages());
+  const { approvalRequests } = await renderFullStream(stream.fullStream, {
+    showSteps: false,
   });
-}
 
-function exitProgram(): void {
-  rl.close();
-  process.exit(0);
-}
+  const response = await stream.response;
+  messageHistory.addModelMessages(response.messages);
 
-function setModel(model: LanguageModel, modelId: string): void {
-  agent.setModel(wrapModel(model));
-  currentModelId = modelId;
-}
-
-async function main(): Promise<void> {
-  console.log(`Chat with AI (model: ${currentModelId})`);
-  console.log("Use '/help' for commands, 'ctrl-c' to quit");
-  console.log();
-
-  while (true) {
-    const userInput = await getUserInput();
-
-    if (userInput === null) {
-      break;
-    }
-
-    const trimmed = userInput.trim();
-    if (trimmed === "") {
-      continue;
-    }
-
-    if (trimmed.startsWith("/")) {
-      const result = await handleCommand(trimmed, {
-        agent,
-        currentConversationId,
-        currentModelId,
-        readline: rl,
-        setModel,
-        exit: exitProgram,
-      });
-      currentConversationId = result.conversationId;
-      console.log();
-      continue;
-    }
-
-    try {
-      await agent.chat(userInput);
-    } catch (error) {
-      console.error("An error occurred:", error);
-    }
-
-    console.log();
+  if (approvalRequests.length > 0) {
+    const approvals = await askBatchApproval(rl, approvalRequests);
+    messageHistory.addToolApprovalResponses(approvals);
+    await processAgentResponse(rl);
   }
+};
 
-  rl.close();
-}
+const run = async (): Promise<void> => {
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
 
-main().catch(console.error);
+  try {
+    while (true) {
+      const input = await rl.question("You: ");
+      const trimmed = input.trim();
+      if (trimmed.length === 0 || trimmed.toLowerCase() === "exit") {
+        break;
+      }
+
+      if (isCommand(trimmed)) {
+        try {
+          const result = await executeCommand(trimmed);
+          if (result?.message) {
+            console.log(result.message);
+          }
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : "Unknown error";
+          console.error(`Command error: ${errorMessage}`);
+        }
+        continue;
+      }
+
+      messageHistory.addUserMessage(trimmed);
+      await processAgentResponse(rl);
+    }
+  } finally {
+    rl.close();
+  }
+};
+
+run().catch((error: unknown) => {
+  throw error instanceof Error ? error : new Error("Failed to run stream.");
+});
