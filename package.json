@@ -8,10 +8,10 @@
     "code-editing-agent": "./src/index.ts"
   },
   "scripts": {
-    "start": "bun run src/index.ts",
-    "headless": "bun run src/headless.ts",
+    "start": "bun run src/entrypoints/cli.ts",
+    "headless": "bun run src/entrypoints/headless.ts",
     "build": "tsc",
-    "dev": "bun run --watch src/index.ts",
+    "dev": "bun run --watch src/entrypoints/cli.ts",
     "check": "ultracite check",
     "lint": "ultracite fix",
     "typecheck": "tsc --noEmit"

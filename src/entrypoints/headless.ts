@@ -2,12 +2,11 @@
 
 /**
  * Headless mode entry point for Harbor integration.
- * Usage: bun run src/headless.ts -p "instruction"
+ * Usage: bun run src/entrypoints/headless.ts -p "instruction"
  */
 
-import type { ToolApprovalResponse } from "ai";
-import { agentManager } from "./agent";
-import { MessageHistory } from "./context/message-history";
+import { agentManager, DEFAULT_MODEL_ID } from "../agent";
+import { MessageHistory } from "../context/message-history";
 
 interface TrajectoryEvent {
   timestamp: string;
@@ -50,42 +49,18 @@ const parseArgs = (): { prompt: string } => {
   }
 
   if (!prompt) {
-    console.error("Usage: bun run src/headless.ts -p <prompt>");
+    console.error("Usage: bun run src/entrypoints/headless.ts -p <prompt>");
     process.exit(1);
   }
 
   return { prompt };
 };
 
-const autoApproveAll = (
-  requests: Array<{
-    approvalId: string;
-    toolCall: { toolName: string };
-  }>
-): ToolApprovalResponse[] => {
-  return requests.map((req) => ({
-    type: "tool-approval-response" as const,
-    approvalId: req.approvalId,
-    approved: true,
-    reason: "Auto-approved in headless mode",
-  }));
-};
-
-interface ApprovalRequest {
-  type: "tool-approval-request";
-  approvalId: string;
-  toolCall: {
-    toolName: string;
-    toolCallId: string;
-    input: unknown;
-  };
-}
-
 const processAgentResponse = async (
   messageHistory: MessageHistory
 ): Promise<void> => {
   const stream = await agentManager.stream(messageHistory.toModelMessages());
-  const approvalRequests: ApprovalRequest[] = [];
+  const modelId = agentManager.getModelId();
 
   let currentText = "";
 
@@ -109,7 +84,7 @@ const processAgentResponse = async (
                 input: part.input,
               },
             ],
-            model: agentManager.getModelId(),
+            model: modelId,
           },
         });
         break;
@@ -144,9 +119,6 @@ const processAgentResponse = async (
           },
         });
         break;
-      case "tool-approval-request":
-        approvalRequests.push(part);
-        break;
       default:
         break;
     }
@@ -163,20 +135,18 @@ const processAgentResponse = async (
       message: {
         role: "assistant",
         content: currentText,
-        model: agentManager.getModelId(),
+        model: modelId,
       },
     });
-  }
-
-  if (approvalRequests.length > 0) {
-    const approvals = autoApproveAll(approvalRequests);
-    messageHistory.addToolApprovalResponses(approvals);
-    await processAgentResponse(messageHistory);
   }
 };
 
 const run = async (): Promise<void> => {
   const { prompt } = parseArgs();
+
+  agentManager.setHeadlessMode(true);
+  agentManager.setModelId(DEFAULT_MODEL_ID);
+
   const messageHistory = new MessageHistory();
 
   emitEvent({

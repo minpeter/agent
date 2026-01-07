@@ -6,7 +6,7 @@ import { env } from "./env";
 import { trimLeadingNewlinesMiddleware } from "./middleware/trim-leading-newlines";
 import { tools } from "./tools";
 
-const DEFAULT_MODEL_ID = "Qwen/Qwen3-235B-A22B-Instruct-2507";
+export const DEFAULT_MODEL_ID = "Qwen/Qwen3-235B-A22B-Instruct-2507";
 const OUTPUT_TOKEN_MAX = 32_000;
 
 const friendli = createFriendli({
@@ -14,16 +14,32 @@ const friendli = createFriendli({
   includeUsage: true,
 });
 
-const createAgent = (modelId: string) =>
+const disableApprovalForTools = <T extends Record<string, unknown>>(
+  toolsObj: T
+): T => {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(toolsObj)) {
+    if (typeof value === "object" && value !== null) {
+      result[key] = { ...value, needsApproval: false };
+    } else {
+      result[key] = value;
+    }
+  }
+  return result as T;
+};
+
+interface CreateAgentOptions {
+  disableApproval?: boolean;
+}
+
+const createAgent = (modelId: string, options: CreateAgentOptions = {}) =>
   new ToolLoopAgent({
     model: wrapLanguageModel({
       model: friendli(modelId),
       middleware: trimLeadingNewlinesMiddleware,
     }),
     instructions: SYSTEM_PROMPT,
-    tools: {
-      ...tools,
-    },
+    tools: options.disableApproval ? disableApprovalForTools(tools) : tools,
     maxOutputTokens: OUTPUT_TOKEN_MAX,
     providerOptions: {
       friendli: {
@@ -36,6 +52,7 @@ const createAgent = (modelId: string) =>
 
 class AgentManager {
   private modelId: string = DEFAULT_MODEL_ID;
+  private headlessMode = false;
 
   getModelId(): string {
     return this.modelId;
@@ -43,6 +60,14 @@ class AgentManager {
 
   setModelId(modelId: string): void {
     this.modelId = modelId;
+  }
+
+  setHeadlessMode(enabled: boolean): void {
+    this.headlessMode = enabled;
+  }
+
+  isHeadlessMode(): boolean {
+    return this.headlessMode;
   }
 
   getInstructions(): string {
@@ -54,7 +79,9 @@ class AgentManager {
   }
 
   stream(messages: ModelMessage[]) {
-    const agent = createAgent(this.modelId);
+    const agent = createAgent(this.modelId, {
+      disableApproval: this.headlessMode,
+    });
     return agent.stream({ messages });
   }
 }
