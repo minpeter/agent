@@ -1,6 +1,7 @@
 import type { Writable } from "node:stream";
 import type { TextStreamPart, ToolSet } from "ai";
 import { colorize, colors } from "./colors";
+import { env } from "../env";
 
 export interface StreamRenderOptions {
   output?: Writable;
@@ -315,7 +316,7 @@ export const renderFullStream = async <TOOLS extends ToolSet>(
     showReasoning: options.showReasoning ?? true,
     showToolInput: options.showToolInput ?? true,
     showSteps: options.showSteps ?? false,
-    showFinishReason: options.showFinishReason ?? true,
+    showFinishReason: options.showFinishReason ?? env.DEBUG_SHOW_FINISH_REASON,
     showSources: options.showSources ?? true,
     showFiles: options.showFiles ?? true,
     useColor: options.useColor ?? Boolean(process.stdout.isTTY),
