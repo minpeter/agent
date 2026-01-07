@@ -224,15 +224,9 @@ const handleToolOutputDenied = (
 };
 
 const handleToolApprovalRequest = (
-  ctx: RenderContext,
-  part: Extract<StreamPart, { type: "tool-approval-request" }>
+  _ctx: RenderContext,
+  _part: Extract<StreamPart, { type: "tool-approval-request" }>
 ): StreamMode => {
-  writeLine(ctx);
-  writeLine(
-    ctx,
-    `${applyColor(ctx, "yellow", "⚠ APPROVAL REQUIRED")}: ${part.toolCall.toolName}`
-  );
-  writeLine(ctx, formatBlock(part.toolCall.input));
   return "none";
 };
 
