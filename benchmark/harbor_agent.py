@@ -35,6 +35,10 @@ class CodeEditingAgent(BaseInstalledAgent):
         log_file = self.logs_dir / "agent" / "output.jsonl"
         if log_file.exists():
             return log_file
+        # Fallback: check if file exists directly in logs_dir
+        alt_log_file = self.logs_dir / "output.jsonl"
+        if alt_log_file.exists():
+            return alt_log_file
         return None
 
     def _convert_events_to_trajectory(self, log_file: Path) -> Trajectory | None:
@@ -172,7 +176,12 @@ class CodeEditingAgent(BaseInstalledAgent):
     def populate_context_post_run(self, context: AgentContext) -> None:
         log_file = self._get_log_file()
         if not log_file:
-            print("No output log file found")
+            # Debug: print actual paths being checked
+            expected_path = self.logs_dir / "agent" / "output.jsonl"
+            print(f"No output log file found at: {expected_path}")
+            print(
+                f"logs_dir contents: {list(self.logs_dir.glob('**/*')) if self.logs_dir.exists() else 'dir not found'}"
+            )
             return
 
         try:
