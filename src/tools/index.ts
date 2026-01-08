@@ -1,4 +1,5 @@
-import { runShellCommandTool } from "./execute/run-shell-command";
+import { shellExecuteTool } from "./execute/shell-execute";
+import { shellInteractTool } from "./execute/shell-interact/shell-interact";
 import { globTool } from "./explore/glob";
 import { grepTool } from "./explore/grep";
 import { readFileTool } from "./explore/read-file";
@@ -7,7 +8,8 @@ import { editFileTool } from "./modify/edit-file";
 import { writeFileTool } from "./modify/write-file";
 
 export const tools = {
-  run_shell_command: runShellCommandTool,
+  shell_execute: shellExecuteTool,
+  shell_interact: shellInteractTool,
   write_file: writeFileTool,
   edit_file: editFileTool,
   read_file: readFileTool,

@@ -2,6 +2,10 @@
 
 import { agentManager, DEFAULT_MODEL_ID } from "../agent";
 import { MessageHistory } from "../context/message-history";
+import {
+  cleanupAllTrackedSessions,
+  setCurrentSessionId,
+} from "../tools/execute/shell-interact/hook";
 
 interface BaseEvent {
   timestamp: string;
@@ -50,6 +54,13 @@ type TrajectoryEvent =
   | ErrorEvent;
 
 const sessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+setCurrentSessionId(sessionId);
+
+process.on("SIGINT", async () => {
+  await cleanupAllTrackedSessions(sessionId);
+  process.exit(0);
+});
+
 const startTime = Date.now();
 
 const emitEvent = (event: TrajectoryEvent): void => {
@@ -254,9 +265,11 @@ const run = async (): Promise<void> => {
       sessionId,
       error: error instanceof Error ? error.message : String(error),
     });
+    await cleanupAllTrackedSessions(sessionId);
     process.exit(1);
   }
 
+  await cleanupAllTrackedSessions(sessionId);
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
   console.error(`[headless] Completed in ${elapsed}s`);
 };

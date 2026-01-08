@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CommandError, executeCommand } from "./run-shell-command";
+import { CommandError, executeCommand } from "./shell-execute";
 
 const PID_PATTERN = /^\d+$/;
 

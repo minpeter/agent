@@ -80,20 +80,9 @@ export function executeCommand(
   });
 }
 
-export const runShellCommandTool = tool({
-  description: `Execute a shell command and return the output.
-
-Parameters:
-- command (required): The shell command to execute
-- workdir (optional): Absolute path for command execution
-
-Constraints:
-- Do NOT use & for background processes
-- Do NOT use interactive commands (REPLs, editors, password prompts)
-- Output is truncated to last 50000 characters
-- Environment variables and \`cd\` do NOT persist between tool calls
-- Commands run in workspace root by default
-- Only use workdir parameter for different directory`,
+export const shellExecuteTool = tool({
+  description:
+    "Run a command non-interactively. Capture stdout/stderr. Fails if input/prompt is required.",
 
   inputSchema: z.object({
     command: z.string().describe("The shell command to execute"),

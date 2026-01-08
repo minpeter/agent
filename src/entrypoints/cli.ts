@@ -1,10 +1,5 @@
 #!/usr/bin/env bun
 
-/**
- * Interactive CLI entry point.
- * Usage: bun run src/entrypoints/cli.ts
- */
-
 import type { Interface } from "node:readline/promises";
 import { createInterface } from "node:readline/promises";
 import { agentManager } from "../agent";
@@ -15,6 +10,18 @@ import { createRenderCommand } from "../commands/render";
 import { MessageHistory } from "../context/message-history";
 import { renderFullStream } from "../interaction/stream-renderer";
 import { askBatchApproval } from "../interaction/tool-approval";
+import {
+  cleanupAllTrackedSessions,
+  setCurrentSessionId,
+} from "../tools/execute/shell-interact/hook";
+
+const sessionId = `cli-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+setCurrentSessionId(sessionId);
+
+process.on("SIGINT", async () => {
+  await cleanupAllTrackedSessions(sessionId);
+  process.exit(0);
+});
 
 const messageHistory = new MessageHistory();
 
@@ -77,6 +84,7 @@ const run = async (): Promise<void> => {
       await processAgentResponse(rl);
     }
   } finally {
+    await cleanupAllTrackedSessions(sessionId);
     rl.close();
   }
 };
