@@ -70,19 +70,53 @@ class CodeEditingAgent(BaseInstalledAgent):
             message = event.get("message", {})
 
             if event_type == "user":
-                step_id += 1
                 content = message.get("content", "")
-                text_content = (
-                    str(content) if isinstance(content, list) else str(content)
-                )
-                steps.append(
-                    Step(
-                        step_id=step_id,
-                        timestamp=timestamp,
-                        source="user",
-                        message=text_content,
+
+                # Check if this is a tool_result (response to previous tool call)
+                is_tool_result = False
+                if isinstance(content, list):
+                    for item in content:
+                        if isinstance(item, dict) and item.get("type") == "tool_result":
+                            is_tool_result = True
+                            break
+
+                if is_tool_result:
+                    # This is a tool result - attach to previous agent step as observation
+                    tool_result = event.get("toolUseResult")
+                    if tool_result and steps and steps[-1].source == "agent":
+                        # Find the tool_call_id from the content
+                        tool_use_id = None
+                        for item in content:
+                            if (
+                                isinstance(item, dict)
+                                and item.get("type") == "tool_result"
+                            ):
+                                tool_use_id = item.get("tool_use_id")
+                                break
+
+                        # Update previous step's observation
+                        steps[-1].observation = Observation(
+                            results=[
+                                ObservationResult(
+                                    source_call_id=tool_use_id or "",
+                                    content=tool_result.get("stdout", ""),
+                                )
+                            ]
+                        )
+                else:
+                    # This is actual user input
+                    step_id += 1
+                    text_content = (
+                        str(content) if isinstance(content, list) else str(content)
                     )
-                )
+                    steps.append(
+                        Step(
+                            step_id=step_id,
+                            timestamp=timestamp,
+                            source="user",
+                            message=text_content,
+                        )
+                    )
 
             elif event_type == "assistant":
                 step_id += 1
@@ -103,8 +137,10 @@ class CodeEditingAgent(BaseInstalledAgent):
                                     arguments=block.get("input", {}),
                                 )
                             )
-                        else:
-                            text_content += str(block)
+                        elif isinstance(block, dict) and block.get("type") == "text":
+                            text_content += block.get("text", "")
+                        elif isinstance(block, str):
+                            text_content += block
                 else:
                     text_content = str(content)
 
@@ -116,18 +152,6 @@ class CodeEditingAgent(BaseInstalledAgent):
                         cached_tokens=usage.get("cache_read_input_tokens"),
                     )
 
-                observation = None
-                tool_result = event.get("toolUseResult")
-                if tool_result and tool_calls:
-                    observation = Observation(
-                        results=[
-                            ObservationResult(
-                                source_call_id=tool_calls[0].tool_call_id,
-                                content=tool_result.get("stdout", ""),
-                            )
-                        ]
-                    )
-
                 steps.append(
                     Step(
                         step_id=step_id,
@@ -136,7 +160,7 @@ class CodeEditingAgent(BaseInstalledAgent):
                         message=text_content or "Tool execution",
                         model_name=model_name or self.model_name,
                         tool_calls=tool_calls if tool_calls else None,
-                        observation=observation,
+                        observation=None,  # Will be filled by next user event if tool_result
                         metrics=metrics,
                     )
                 )
