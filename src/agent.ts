@@ -45,7 +45,6 @@ const createAgent = (modelId: string, options: CreateAgentOptions = {}) =>
     }),
     instructions: options.instructions || SYSTEM_PROMPT,
     tools: options.disableApproval ? disableApprovalForTools(tools) : tools,
-    tool
     maxOutputTokens: OUTPUT_TOKEN_MAX,
     providerOptions: {
       friendli: {
