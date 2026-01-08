@@ -89,7 +89,7 @@ describe("executeCommand", () => {
   });
 
   describe("background processes with &", () => {
-    it("returns with PID when using &", async () => {
+    it("returns with PID when using & with echo", async () => {
       const startTime = Date.now();
       const result = await executeCommand("sleep 10 & echo $!");
       const elapsed = Date.now() - startTime;
@@ -115,6 +115,37 @@ describe("executeCommand", () => {
       expect(verify.output).toContain("Directory listing");
 
       await executeCommand(`kill ${pid}`);
+    });
+
+    it("detects pure background command ending with &", async () => {
+      const result = await executeCommand("sleep 0.1 &");
+
+      expect(result.exitCode).toBe(0);
+      expect(result.output).toContain("[Background process started]");
+    });
+
+    it("does not treat && as background operator", async () => {
+      const result = await executeCommand('echo "first" && echo "second"');
+
+      expect(result.output).toBe("first\nsecond");
+      expect(result.output).not.toContain("[Background process started]");
+    });
+
+    it("starts Flask-like server with pure & and stays running", async () => {
+      const port = 18890;
+      const start = await executeCommand(
+        `python3 -m http.server ${port} > /dev/null 2>&1 &`
+      );
+
+      expect(start.exitCode).toBe(0);
+      expect(start.output).toContain("[Background process started]");
+
+      await new Promise((r) => setTimeout(r, 500));
+
+      const verify = await executeCommand(`curl -s http://localhost:${port}`);
+      expect(verify.output).toContain("Directory listing");
+
+      await executeCommand(`kill $(lsof -t -i:${port}) 2>/dev/null || true`);
     });
   });
 

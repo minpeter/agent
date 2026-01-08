@@ -296,6 +296,36 @@ class SharedTmuxSession {
     return `Current Terminal Screen:\n${this.getVisibleScreen()}`;
   }
 
+  private endsWithBackgroundOperator(command: string): boolean {
+    const trimmed = command.trim();
+    const endsWithAmpersand = trimmed.endsWith("&");
+    const isLogicalAnd = trimmed.endsWith("&&");
+    return endsWithAmpersand && !isLogicalAnd;
+  }
+
+  private async executeAsBackgroundProcess(
+    fullCommand: string,
+    timeoutMs: number
+  ): Promise<ExecuteResult> {
+    const startupWaitMs = Math.min(timeoutMs, 2000);
+
+    await this.sendKeys([fullCommand, "Enter"], {
+      block: false,
+      minTimeoutMs: startupWaitMs,
+    });
+
+    const screen = this.capturePane(false);
+    return {
+      exitCode: 0,
+      output:
+        "[Background process started]\n\n" +
+        `=== Current Terminal Screen ===\n${screen}\n` +
+        "=== End of Screen ===\n\n" +
+        "[SYSTEM REMINDER] The process is running in the background. " +
+        "Use shell_interact to check status or send signals.",
+    };
+  }
+
   async executeCommand(
     command: string,
     options: { workdir?: string; timeoutMs?: number } = {}
@@ -309,6 +339,10 @@ class SharedTmuxSession {
     let fullCommand = command;
     if (workdir) {
       fullCommand = `cd ${escapeShellArg(workdir)} && ${command}`;
+    }
+
+    if (this.endsWithBackgroundOperator(fullCommand)) {
+      return this.executeAsBackgroundProcess(fullCommand, timeoutMs);
     }
 
     const wrappedCommand = `echo __CEA_START__; ${fullCommand}; echo __CEA_EXIT_$?__`;
