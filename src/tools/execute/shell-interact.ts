@@ -6,8 +6,10 @@ const SPECIAL_KEYS: Record<string, string> = {
   enter: "Enter",
   tab: "Tab",
   escape: "Escape",
+  esc: "Escape",
   backspace: "BSpace",
   delete: "DC",
+  del: "DC",
   up: "Up",
   down: "Down",
   left: "Left",
@@ -16,6 +18,7 @@ const SPECIAL_KEYS: Record<string, string> = {
   end: "End",
   pageup: "PPage",
   pagedown: "NPage",
+  space: "Space",
   "ctrl+c": "C-c",
   "ctrl+d": "C-d",
   "ctrl+z": "C-z",
@@ -60,11 +63,12 @@ export interface InteractResult {
 
 export const shellInteractTool = tool({
   description:
-    "Send keystrokes to the shared terminal session. " +
-    "Use this for interactive prompts (y/n), navigation, or when shell_execute fails due to input requirement. " +
+    "Send keystrokes to the SAME terminal session as shell_execute. " +
+    "IMPORTANT: Keystrokes are sent verbatim - you MUST include '<Enter>' or '\\n' to execute commands. " +
+    "Use for: (1) interactive programs, (2) responding to prompts, (3) recovering from shell_execute timeout with '<Ctrl+C>'. " +
     "Special keys: <Enter>, <Tab>, <Escape>, <Up>, <Down>, <Left>, <Right>, " +
     "<Ctrl+C>, <Ctrl+D>, <Ctrl+Z>, <Ctrl+L>, <Backspace>, <Delete>, <Home>, <End>. " +
-    "Example: 'y<Enter>' to answer yes, '<Ctrl+C>' to interrupt, '<Up><Enter>' to repeat last command.",
+    "Examples: 'ls -la<Enter>' to run command, 'y<Enter>' for yes, '<Ctrl+C>' to interrupt.",
 
   inputSchema: z.object({
     keystrokes: z

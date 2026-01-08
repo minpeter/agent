@@ -49,8 +49,10 @@ export async function executeCommand(
 export const shellExecuteTool = tool({
   description:
     "Run a shell command and capture output. " +
-    "For long-running processes (servers, etc.), use '&' to run in background. " +
-    "Commands run in a shared terminal session, so environment persists between calls.",
+    "SHARES the same terminal session with shell_interact - use shell_interact to control interactive programs or recover from timeouts. " +
+    "On timeout, the process may still be running; use shell_interact with '<Ctrl+C>' to interrupt. " +
+    "For long-running processes (servers), use '&' to run in background. " +
+    "Avoid interactive commands (vim, nano, less) - use shell_interact for those.",
 
   inputSchema: z.object({
     command: z.string().describe("The shell command to execute"),

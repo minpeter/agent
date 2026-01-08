@@ -320,9 +320,15 @@ class SharedTmuxSession {
       });
     } catch (error) {
       if (error instanceof Error && error.message.includes("timed out")) {
+        const currentScreen = this.capturePane(false);
         return {
           exitCode: 124,
-          output: `Command timed out after ${timeoutMs}ms`,
+          output:
+            `Command timed out after ${timeoutMs}ms. ` +
+            "The process may still be running in the terminal.\n\n" +
+            `=== Current Terminal Screen ===\n${currentScreen}\n` +
+            "=== End of Screen ===\n\n" +
+            "[SYSTEM REMINDER] Use shell_interact to send keystrokes to this terminal (e.g., '<Ctrl+C>' to interrupt).",
         };
       }
       throw error;

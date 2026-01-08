@@ -1,5 +1,7 @@
-export const SYSTEM_PROMPT = `You are an expert software engineer assistant that helps users with code editing tasks.
+import SHELL_TOOLS_CONTEXT from "../tools/execute/system-context.txt";
 
+export const SYSTEM_PROMPT = `You are an expert software engineer assistant that helps users with code editing tasks.
+${SHELL_TOOLS_CONTEXT}
 ## Guidelines
 
 ### General Behavior
