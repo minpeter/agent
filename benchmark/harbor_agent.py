@@ -224,13 +224,16 @@ class CodeEditingAgent(BaseInstalledAgent):
         }
         env = {k: v for k, v in env.items() if v}
 
+        # Build command with optional model parameter
+        model_arg = f"-m {shlex.quote(self.model_name)}" if self.model_name else ""
+
         return [
             ExecInput(
                 command="mkdir -p /logs/agent",
             ),
             ExecInput(
                 command=(
-                    f"cd /app && /root/.bun/bin/bun /agent/src/entrypoints/headless.ts -p {escaped_instruction} "
+                    f"cd /app && /root/.bun/bin/bun /agent/src/entrypoints/headless.ts -p {escaped_instruction} {model_arg} "
                     f"2>&1 | tee /logs/agent/output.jsonl"
                 ),
                 env=env,
