@@ -142,7 +142,8 @@ export function shellInteractHook(
 
   if (isSessionOperation) {
     sessionReminder = buildSessionReminderMessage(
-      Array.from(state.tmuxSessions)
+      Array.from(state.tmuxSessions),
+      isNewSession && isCeaSession(sessionName) ? sessionName : undefined
     );
   }
 

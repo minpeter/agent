@@ -1,5 +1,5 @@
 import { readFile, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 import ignore, { type Ignore } from "ignore";
 
 const MAX_FILE_SIZE = 1024 * 1024; // 1MB
@@ -90,29 +90,46 @@ export interface FileCheckResult {
   reason?: string;
 }
 
+function getPathForIgnoreCheck(filePath: string, cwd: string): string | null {
+  if (isAbsolute(filePath)) {
+    const relativePath = relative(cwd, filePath);
+    const isInsideProject =
+      !relativePath.startsWith("..") && !isAbsolute(relativePath);
+    return isInsideProject ? relativePath : null;
+  }
+  return filePath;
+}
+
 export async function checkFileReadable(
-  path: string
+  filePath: string
 ): Promise<FileCheckResult> {
   const ig = await getIgnoreFilter();
+  const pathForIgnoreCheck = getPathForIgnoreCheck(filePath, process.cwd());
 
-  if (ig.ignores(path)) {
-    return { allowed: false, reason: `File is ignored by .gitignore: ${path}` };
+  if (pathForIgnoreCheck && ig.ignores(pathForIgnoreCheck)) {
+    return {
+      allowed: false,
+      reason: `File is ignored by .gitignore: ${filePath}`,
+    };
   }
 
-  if (isBinaryFile(path)) {
-    return { allowed: false, reason: `Binary file cannot be read: ${path}` };
+  if (isBinaryFile(filePath)) {
+    return {
+      allowed: false,
+      reason: `Binary file cannot be read: ${filePath}`,
+    };
   }
 
   try {
-    const stats = await stat(path);
+    const stats = await stat(filePath);
     if (stats.size > MAX_FILE_SIZE) {
       return {
         allowed: false,
-        reason: `File too large (${Math.round(stats.size / 1024)}KB > ${MAX_FILE_SIZE / 1024}KB): ${path}`,
+        reason: `File too large (${Math.round(stats.size / 1024)}KB > ${MAX_FILE_SIZE / 1024}KB): ${filePath}`,
       };
     }
   } catch {
-    // File doesn't exist, let the read operation handle this
+    // stat failed - let the actual read operation handle this
   }
 
   return { allowed: true };
