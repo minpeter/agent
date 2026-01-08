@@ -205,6 +205,9 @@ class CodeEditingAgent(BaseInstalledAgent):
 
         env = {
             "FRIENDLI_TOKEN": os.environ.get("FRIENDLI_TOKEN", ""),
+            # Ensure bun is in PATH for all subprocesses
+            "BUN_INSTALL": "/root/.bun",
+            "PATH": "/root/.bun/bin:/usr/local/bin:/usr/bin:/bin",
         }
         env = {k: v for k, v in env.items() if v}
 
@@ -214,8 +217,7 @@ class CodeEditingAgent(BaseInstalledAgent):
             ),
             ExecInput(
                 command=(
-                    f"export BUN_INSTALL=$HOME/.bun && export PATH=$BUN_INSTALL/bin:$PATH && "
-                    f"cd /app && bun /agent/src/entrypoints/headless.ts -p {escaped_instruction} "
+                    f"cd /app && /root/.bun/bin/bun /agent/src/entrypoints/headless.ts -p {escaped_instruction} "
                     f"2>&1 | tee /logs/agent/output.jsonl"
                 ),
                 env=env,
