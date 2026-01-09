@@ -355,7 +355,11 @@ class SharedTmuxSession {
       const currentScreen = this.capturePane(false);
       return {
         exitCode: 124,
-        output: formatTimeoutMessage(timeoutMs, currentScreen),
+        output: formatTimeoutMessage({
+          timeoutMs,
+          terminalScreen: currentScreen,
+          sessionId: this.sessionId,
+        }),
       };
     }
 

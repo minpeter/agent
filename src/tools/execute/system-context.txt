@@ -14,9 +14,26 @@ Use these tools for operations that REQUIRE shell execution. For file operations
 
 **Timeout behavior**:
 - Commands timeout after 10 seconds (configurable)
-- On timeout, returns `[TIMEOUT]` message with current terminal screen
+- On timeout, returns `[TIMEOUT]` or `[INTERACTIVE PROMPT DETECTED]` message
 - Terminal output format: `=== Current Terminal Screen ===\n...\n=== End of Screen ===`
+- **CRITICAL**: If you see `[INTERACTIVE PROMPT DETECTED]`, you MUST use `shell_interact` to respond before running any other commands
 - Use `shell_interact` with `<Ctrl+C>` to interrupt hung processes
+
+**Interactive prompt detection methods** (multiple signals used):
+- `regex_pattern` (high confidence): Matches known prompt patterns like `[Y/n]`, `(Y/I/N/O/D/Z)`, `password:`
+- `process_state` (medium confidence): Detects foreground process in sleeping state
+- `cursor_at_prompt` (medium confidence): Cursor positioned at end of line with prompt indicator
+- `last_line_prompt` (low confidence): Last line ends with `?`, `:`, `>`, or `]`
+
+When detection occurs, the response includes:
+- Which detection method(s) triggered
+- Confidence level for each
+- Suggested actions to take
+
+**Avoiding interactive prompts**:
+- Use `DEBIAN_FRONTEND=noninteractive` for apt-get BEFORE any config files are modified
+- Use `-y` flag for package managers: `apt-get install -y`, `yum install -y`
+- For dpkg config conflicts, respond with `N<Enter>` to keep your version or `Y<Enter>` to use package version
 
 **Example**: `shell_execute("npm install express")`
 
@@ -24,20 +41,24 @@ Use these tools for operations that REQUIRE shell execution. For file operations
 **Purpose**: Send raw keystrokes to the terminal (for interactive programs)
 
 **When to use**:
-- Responding to interactive prompts (y/n questions)
+- **REQUIRED** after `[INTERACTIVE PROMPT DETECTED]` - respond before any other commands
+- Responding to interactive prompts (y/n questions, config file conflicts)
 - Recovering from timeouts (send `<Ctrl+C>`)
 - Navigating interactive CLIs (vim, less, interactive REPLs)
-- Sending input to running programs
 
 **Key points**:
 - Must include `<Enter>` or `\n` to execute commands
 - Shares the SAME persistent terminal session with `shell_execute`
 - Returns terminal screen in format: `=== Current Terminal Screen ===\n...\n=== End of Screen ===`
 
-**Example**: 
+**Common responses**:
 ```
-shell_interact("y<Enter>")  # Answer yes to prompt
-shell_interact("<Ctrl+C>")  # Interrupt hung process
+shell_interact("y<Enter>")     # Answer yes
+shell_interact("n<Enter>")     # Answer no  
+shell_interact("N<Enter>")     # Keep current config (dpkg)
+shell_interact("Y<Enter>")     # Use package maintainer's config (dpkg)
+shell_interact("<Ctrl+C>")     # Interrupt/cancel
+shell_interact("<Enter>")      # Accept default
 ```
 
 ### Important: Use Dedicated Tools for File Operations
