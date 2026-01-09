@@ -32,6 +32,7 @@ const disableApprovalForTools = <T extends Record<string, unknown>>(
 interface CreateAgentOptions {
   disableApproval?: boolean;
   instructions?: string;
+  enableThinking?: boolean;
 }
 
 const createAgent = (modelId: string, options: CreateAgentOptions = {}) =>
@@ -46,8 +47,8 @@ const createAgent = (modelId: string, options: CreateAgentOptions = {}) =>
     providerOptions: {
       friendli: {
         chat_template_kwargs: {
-          enable_thinking: true,
-          thinking: true,
+          enable_thinking: options.enableThinking ?? true,
+          thinking: options.enableThinking ?? true,
         },
       },
     },
@@ -56,6 +57,7 @@ const createAgent = (modelId: string, options: CreateAgentOptions = {}) =>
 class AgentManager {
   private modelId: string = DEFAULT_MODEL_ID;
   private headlessMode = false;
+  private thinkingEnabled = false;
 
   getModelId(): string {
     return this.modelId;
@@ -73,6 +75,14 @@ class AgentManager {
     return this.headlessMode;
   }
 
+  setThinkingEnabled(enabled: boolean): void {
+    this.thinkingEnabled = enabled;
+  }
+
+  isThinkingEnabled(): boolean {
+    return this.thinkingEnabled;
+  }
+
   getInstructions(): string {
     return SYSTEM_PROMPT + getEnvironmentContext();
   }
@@ -85,6 +95,7 @@ class AgentManager {
     const agent = createAgent(this.modelId, {
       disableApproval: this.headlessMode,
       instructions: this.getInstructions(),
+      enableThinking: this.thinkingEnabled,
     });
     return agent.stream({ messages });
   }

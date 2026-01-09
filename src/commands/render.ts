@@ -4,70 +4,70 @@ import { generateText } from "ai";
 import { env } from "../env";
 import type { Command, CommandResult } from "./types";
 
-const customFetch = Object.assign(
-  async (_url: RequestInfo | URL, options?: RequestInit): Promise<Response> => {
-    const parsedBody = options?.body ? JSON.parse(options.body as string) : {};
-    const { tool_choice: _ignored, ...bodyWithoutToolChoice } = parsedBody;
+const customFetch = (thinkingEnabled: boolean) =>
+  Object.assign(
+    async (
+      _url: RequestInfo | URL,
+      options?: RequestInit
+    ): Promise<Response> => {
+      const parsedBody = options?.body
+        ? JSON.parse(options.body as string)
+        : {};
+      const { tool_choice: _ignored, ...bodyWithoutToolChoice } = parsedBody;
 
-    const resp = await fetch(
-      "https://api.friendli.ai/serverless/v1/chat/render",
-      {
-        ...options,
-        body: JSON.stringify({
-          ...bodyWithoutToolChoice,
-          chat_template_kwargs: {
-            enable_thinking: true,
-            thinking: true,
-          },
-        }),
-      }
-    );
-
-    if (!resp.ok) {
-      const errorText = await resp.text();
-      throw new Error(`API error ${resp.status}: ${errorText}`);
-    }
-
-    const data = (await resp.json()) as { text: string };
-
-    const result = {
-      id: "chatcmpl-render",
-      model: "dummy",
-      object: "chat.completion",
-      choices: [
+      const resp = await fetch(
+        "https://api.friendli.ai/serverless/v1/chat/render",
         {
-          index: 0,
-          message: {
-            role: "assistant",
-            content: data.text,
+          ...options,
+          body: JSON.stringify({
+            ...bodyWithoutToolChoice,
+            chat_template_kwargs: {
+              enable_thinking: thinkingEnabled,
+              thinking: thinkingEnabled,
+            },
+          }),
+        }
+      );
+
+      if (!resp.ok) {
+        const errorText = await resp.text();
+        throw new Error(`API error ${resp.status}: ${errorText}`);
+      }
+
+      const data = (await resp.json()) as { text: string };
+
+      const result = {
+        id: "chatcmpl-render",
+        model: "dummy",
+        object: "chat.completion",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: data.text,
+            },
+            finish_reason: "stop",
           },
-          finish_reason: "stop",
-        },
-      ],
-      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-      created: Date.now(),
-    };
+        ],
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+        created: Date.now(),
+      };
 
-    return new Response(JSON.stringify(result), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  },
-  { preconnect: fetch.preconnect }
-);
-
-const friendli = createOpenAICompatible({
-  name: "friendli",
-  apiKey: env.FRIENDLI_TOKEN,
-  baseURL: "https://api.friendli.ai/serverless/v1",
-  fetch: customFetch,
-});
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    { preconnect: fetch.preconnect }
+  );
 
 interface RenderData {
   model: string;
   instructions: string;
   tools: ToolSet;
   messages: ModelMessage[];
+  thinkingEnabled: boolean;
 }
 
 async function renderChatPrompt({
@@ -75,7 +75,15 @@ async function renderChatPrompt({
   instructions,
   tools,
   messages,
+  thinkingEnabled,
 }: RenderData): Promise<string> {
+  const friendli = createOpenAICompatible({
+    name: "friendli",
+    apiKey: env.FRIENDLI_TOKEN,
+    baseURL: "https://api.friendli.ai/serverless/v1",
+    fetch: customFetch(thinkingEnabled),
+  });
+
   const result = await generateText({
     model: friendli(model),
     system: instructions,

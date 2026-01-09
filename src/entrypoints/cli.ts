@@ -7,6 +7,7 @@ import { executeCommand, isCommand, registerCommand } from "../commands";
 import { createClearCommand } from "../commands/clear";
 import { createModelCommand } from "../commands/model";
 import { createRenderCommand } from "../commands/render";
+import { createThinkCommand } from "../commands/think";
 import { MessageHistory } from "../context/message-history";
 import { env } from "../env";
 import { colorize } from "../interaction/colors";
@@ -32,10 +33,12 @@ registerCommand(
     instructions: agentManager.getInstructions(),
     tools: agentManager.getTools(),
     messages: messageHistory.toModelMessages(),
+    thinkingEnabled: agentManager.isThinkingEnabled(),
   }))
 );
 registerCommand(createModelCommand());
 registerCommand(createClearCommand(messageHistory));
+registerCommand(createThinkCommand());
 
 const processAgentResponse = async (rl: Interface): Promise<void> => {
   const stream = await agentManager.stream(messageHistory.toModelMessages());
@@ -53,7 +56,23 @@ const processAgentResponse = async (rl: Interface): Promise<void> => {
   }
 };
 
+const parseCliArgs = (): { thinking: boolean } => {
+  const args = process.argv.slice(2);
+  let thinking = false;
+
+  for (const arg of args) {
+    if (arg === "--think") {
+      thinking = true;
+    }
+  }
+
+  return { thinking };
+};
+
 const run = async (): Promise<void> => {
+  const { thinking } = parseCliArgs();
+  agentManager.setThinkingEnabled(thinking);
+
   const rl = createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -104,7 +123,14 @@ const run = async (): Promise<void> => {
       }
 
       messageHistory.addUserMessage(trimmed);
-      await processAgentResponse(rl);
+      try {
+        await processAgentResponse(rl);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        console.error(`\nError: ${errorMessage}`);
+        console.error("Returning to prompt...\n");
+      }
     }
   } catch (error) {
     console.error("Error:", error);

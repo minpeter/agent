@@ -63,10 +63,15 @@ const emitEvent = (event: TrajectoryEvent): void => {
   console.log(JSON.stringify(event));
 };
 
-const parseArgs = (): { prompt: string; model?: string } => {
+const parseArgs = (): {
+  prompt: string;
+  model?: string;
+  thinking: boolean;
+} => {
   const args = process.argv.slice(2);
   let prompt = "";
   let model: string | undefined;
+  let thinking = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "-p" || args[i] === "--prompt") {
@@ -75,17 +80,19 @@ const parseArgs = (): { prompt: string; model?: string } => {
     } else if (args[i] === "-m" || args[i] === "--model") {
       model = args[i + 1] || undefined;
       i++;
+    } else if (args[i] === "--think") {
+      thinking = true;
     }
   }
 
   if (!prompt) {
     console.error(
-      "Usage: bun run src/entrypoints/headless.ts -p <prompt> [-m <model>]"
+      "Usage: bun run src/entrypoints/headless.ts -p <prompt> [-m <model>] [--think]"
     );
     process.exit(1);
   }
 
-  return { prompt, model };
+  return { prompt, model, thinking };
 };
 
 const extractToolOutput = (
@@ -236,10 +243,11 @@ const processAgentResponse = async (
 };
 
 const run = async (): Promise<void> => {
-  const { prompt, model } = parseArgs();
+  const { prompt, model, thinking } = parseArgs();
 
   agentManager.setHeadlessMode(true);
   agentManager.setModelId(model || DEFAULT_MODEL_ID);
+  agentManager.setThinkingEnabled(thinking);
 
   const messageHistory = new MessageHistory();
 
