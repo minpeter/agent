@@ -1,8 +1,9 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { ModelMessage, ToolSet } from "ai";
-import { generateText } from "ai";
+import { generateText, wrapLanguageModel } from "ai";
 import { env } from "../env";
 import { Spinner } from "../interaction/spinner";
+import { buildMiddlewares } from "../middleware";
 import type { Command, CommandResult } from "./types";
 
 const customFetch = (thinkingEnabled: boolean) =>
@@ -69,6 +70,7 @@ interface RenderData {
   tools: ToolSet;
   messages: ModelMessage[];
   thinkingEnabled: boolean;
+  toolFallbackEnabled: boolean;
 }
 
 async function renderChatPrompt({
@@ -77,6 +79,7 @@ async function renderChatPrompt({
   tools,
   messages,
   thinkingEnabled,
+  toolFallbackEnabled,
 }: RenderData): Promise<string> {
   const friendli = createOpenAICompatible({
     name: "friendli",
@@ -86,7 +89,12 @@ async function renderChatPrompt({
   });
 
   const result = await generateText({
-    model: friendli(model),
+    model: wrapLanguageModel({
+      model: friendli(model),
+      middleware: buildMiddlewares({
+        enableToolFallback: toolFallbackEnabled,
+      }),
+    }),
     system: instructions,
     tools,
     messages,
