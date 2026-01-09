@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSharedSession } from "./shared-tmux-session";
 
 const MAX_OUTPUT_LENGTH = 50_000;
-const DEFAULT_TIMEOUT_MS = 10_000;
+const DEFAULT_TIMEOUT_MS = 2_000;
 
 export interface CommandResult {
   exitCode: number;
@@ -50,7 +50,7 @@ export const shellExecuteTool = tool({
   description:
     "Execute shell commands (git, npm, build, tests). " +
     "Shares terminal session with shell_interact. " +
-    "10s timeout (configurable). On timeout, use shell_interact with '<Ctrl+C>' to interrupt.",
+    "2s timeout (configurable). On timeout, use shell_interact with '<Ctrl+C>' to interrupt.",
 
   inputSchema: z.object({
     command: z.string().describe("Shell command to execute"),
@@ -61,7 +61,7 @@ export const shellExecuteTool = tool({
     timeout_ms: z
       .number()
       .optional()
-      .describe("Timeout in milliseconds (default: 10000)"),
+      .describe("Timeout in milliseconds (default: 2000)"),
   }),
 
   needsApproval: true,
