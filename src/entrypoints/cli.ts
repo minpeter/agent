@@ -31,6 +31,7 @@ process.on("exit", () => {
 registerCommand(
   createRenderCommand(() => ({
     model: agentManager.getModelId(),
+    modelType: agentManager.getModelType(),
     instructions: agentManager.getInstructions(),
     tools: agentManager.getTools(),
     messages: messageHistory.toModelMessages(),

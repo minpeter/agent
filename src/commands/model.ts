@@ -176,6 +176,7 @@ export const createModelCommand = (): Command => ({
       }
 
       agentManager.setModelId(selectedModel.id);
+      agentManager.setModelType(selectedModel.type || "serverless");
       return {
         success: true,
         message: colorize("green", `Model changed to: ${selectedModel.id}`),

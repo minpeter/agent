@@ -58,8 +58,11 @@ const createAgent = (modelId: string, options: CreateAgentOptions = {}) => {
   });
 };
 
+export type ModelType = "serverless" | "dedicated";
+
 class AgentManager {
   private modelId: string = DEFAULT_MODEL_ID;
+  private modelType: ModelType = "serverless";
   private headlessMode = false;
   private thinkingEnabled = false;
   private toolFallbackEnabled = false;
@@ -70,6 +73,14 @@ class AgentManager {
 
   setModelId(modelId: string): void {
     this.modelId = modelId;
+  }
+
+  getModelType(): ModelType {
+    return this.modelType;
+  }
+
+  setModelType(type: ModelType): void {
+    this.modelType = type;
   }
 
   setHeadlessMode(enabled: boolean): void {

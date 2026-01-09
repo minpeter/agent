@@ -1,12 +1,13 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { ModelMessage, ToolSet } from "ai";
 import { generateText, wrapLanguageModel } from "ai";
+import type { ModelType } from "../agent";
 import { env } from "../env";
 import { Spinner } from "../interaction/spinner";
 import { buildMiddlewares } from "../middleware";
 import type { Command, CommandResult } from "./types";
 
-const customFetch = (thinkingEnabled: boolean) =>
+const customFetch = (thinkingEnabled: boolean, isDedicated: boolean) =>
   Object.assign(
     async (
       _url: RequestInfo | URL,
@@ -17,19 +18,20 @@ const customFetch = (thinkingEnabled: boolean) =>
         : {};
       const { tool_choice: _ignored, ...bodyWithoutToolChoice } = parsedBody;
 
-      const resp = await fetch(
-        "https://api.friendli.ai/serverless/v1/chat/render",
-        {
-          ...options,
-          body: JSON.stringify({
-            ...bodyWithoutToolChoice,
-            chat_template_kwargs: {
-              enable_thinking: thinkingEnabled,
-              thinking: thinkingEnabled,
-            },
-          }),
-        }
-      );
+      const endpoint = isDedicated
+        ? "https://api.friendli.ai/dedicated/v1/chat/render"
+        : "https://api.friendli.ai/serverless/v1/chat/render";
+
+      const resp = await fetch(endpoint, {
+        ...options,
+        body: JSON.stringify({
+          ...bodyWithoutToolChoice,
+          chat_template_kwargs: {
+            enable_thinking: thinkingEnabled,
+            thinking: thinkingEnabled,
+          },
+        }),
+      });
 
       if (!resp.ok) {
         const errorText = await resp.text();
@@ -66,6 +68,7 @@ const customFetch = (thinkingEnabled: boolean) =>
 
 interface RenderData {
   model: string;
+  modelType: ModelType;
   instructions: string;
   tools: ToolSet;
   messages: ModelMessage[];
@@ -75,17 +78,23 @@ interface RenderData {
 
 async function renderChatPrompt({
   model,
+  modelType,
   instructions,
   tools,
   messages,
   thinkingEnabled,
   toolFallbackEnabled,
 }: RenderData): Promise<string> {
+  const isDedicated = modelType === "dedicated";
+  const baseURL = isDedicated
+    ? "https://api.friendli.ai/dedicated/v1"
+    : "https://api.friendli.ai/serverless/v1";
+
   const friendli = createOpenAICompatible({
     name: "friendli",
     apiKey: env.FRIENDLI_TOKEN,
-    baseURL: "https://api.friendli.ai/serverless/v1",
-    fetch: customFetch(thinkingEnabled),
+    baseURL,
+    fetch: customFetch(thinkingEnabled, isDedicated),
   });
 
   const result = await generateText({
