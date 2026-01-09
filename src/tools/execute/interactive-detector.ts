@@ -406,7 +406,16 @@ export function formatDetectionResults(results: DetectionResult[]): string {
     return "";
   }
 
-  const lines: string[] = ["[INTERACTIVE PROMPT DETECTED]", ""];
+  const lines: string[] = [
+    "[INTERACTIVE PROMPT DETECTED]",
+    "",
+    "⚠️  TERMINAL BLOCKED - DO NOT use shell_execute  ⚠️",
+    "",
+    "The terminal is occupied by a running process.",
+    "If you call shell_execute now, your command will be sent AS INPUT to this process,",
+    "NOT executed as a new command. This will cause unexpected behavior.",
+    "",
+  ];
 
   for (const result of results) {
     lines.push(
@@ -416,7 +425,7 @@ export function formatDetectionResults(results: DetectionResult[]): string {
   }
 
   lines.push("");
-  lines.push("[SUGGESTED ACTIONS]");
+  lines.push("[REQUIRED ACTIONS]");
 
   const highConfidenceResult = results.find((r) => r.confidence === "high");
   if (highConfidenceResult) {
@@ -434,6 +443,19 @@ export function formatDetectionResults(results: DetectionResult[]): string {
       lines.push(`• ${action}`);
     }
   }
+
+  lines.push("");
+  lines.push("[FOR LONG-RUNNING PROCESSES]");
+  lines.push("If you intended to start a server or long-running task:");
+  lines.push(
+    "1. First: shell_interact('<Ctrl+C>') to terminate the current process"
+  );
+  lines.push(
+    "2. Then: shell_execute('nohup your_command > /tmp/output.log 2>&1 &') for background execution"
+  );
+  lines.push(
+    "3. Verify: shell_execute('curl ...') or other commands to test the service"
+  );
 
   return lines.join("\n");
 }

@@ -218,7 +218,7 @@ describe("formatDetectionResults", () => {
     expect(formatted).toContain("[INTERACTIVE PROMPT DETECTED]");
     expect(formatted).toContain("regex_pattern");
     expect(formatted).toContain("high");
-    expect(formatted).toContain("[SUGGESTED ACTIONS]");
+    expect(formatted).toContain("[REQUIRED ACTIONS]");
     expect(formatted).toContain("Y<Enter>");
   });
 
