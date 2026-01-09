@@ -4,7 +4,7 @@ import { ToolLoopAgent, wrapLanguageModel } from "ai";
 import { getEnvironmentContext } from "./context/environment-context";
 import { SYSTEM_PROMPT } from "./context/system-prompt";
 import { env } from "./env";
-import { trimLeadingNewlinesMiddleware } from "./middleware/trim-leading-newlines";
+import { buildMiddlewares } from "./middleware";
 import { tools } from "./tools";
 
 export const DEFAULT_MODEL_ID = "Qwen/Qwen3-235B-A22B-Thinking-2507";
@@ -33,13 +33,16 @@ interface CreateAgentOptions {
   disableApproval?: boolean;
   instructions?: string;
   enableThinking?: boolean;
+  enableToolFallback?: boolean;
 }
 
-const createAgent = (modelId: string, options: CreateAgentOptions = {}) =>
-  new ToolLoopAgent({
+const createAgent = (modelId: string, options: CreateAgentOptions = {}) => {
+  return new ToolLoopAgent({
     model: wrapLanguageModel({
       model: friendli(modelId),
-      middleware: trimLeadingNewlinesMiddleware,
+      middleware: buildMiddlewares({
+        enableToolFallback: options.enableToolFallback ?? false,
+      }),
     }),
     instructions: options.instructions || SYSTEM_PROMPT,
     tools: options.disableApproval ? disableApprovalForTools(tools) : tools,
@@ -53,11 +56,13 @@ const createAgent = (modelId: string, options: CreateAgentOptions = {}) =>
       },
     },
   });
+};
 
 class AgentManager {
   private modelId: string = DEFAULT_MODEL_ID;
   private headlessMode = false;
   private thinkingEnabled = false;
+  private toolFallbackEnabled = false;
 
   getModelId(): string {
     return this.modelId;
@@ -83,6 +88,14 @@ class AgentManager {
     return this.thinkingEnabled;
   }
 
+  setToolFallbackEnabled(enabled: boolean): void {
+    this.toolFallbackEnabled = enabled;
+  }
+
+  isToolFallbackEnabled(): boolean {
+    return this.toolFallbackEnabled;
+  }
+
   getInstructions(): string {
     return SYSTEM_PROMPT + getEnvironmentContext();
   }
@@ -96,6 +109,7 @@ class AgentManager {
       disableApproval: this.headlessMode,
       instructions: this.getInstructions(),
       enableThinking: this.thinkingEnabled,
+      enableToolFallback: this.toolFallbackEnabled,
     });
     return agent.stream({ messages });
   }
