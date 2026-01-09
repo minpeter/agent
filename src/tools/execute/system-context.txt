@@ -21,8 +21,10 @@ Use these tools for operations that REQUIRE shell execution. For file operations
 
 **Interactive prompt detection methods** (multiple signals used):
 - `regex_pattern` (high confidence): Matches known prompt patterns like `[Y/n]`, `(Y/I/N/O/D/Z)`, `password:`
+- `linux_proc_tty_wait` (high confidence, Linux only): Detects process waiting for TTY input via /proc filesystem
 - `process_state` (medium confidence): Detects foreground process in sleeping state
 - `cursor_at_prompt` (medium confidence): Cursor positioned at end of line with prompt indicator
+- `output_stall` (medium confidence): Detects when terminal output has stopped changing
 - `last_line_prompt` (low confidence): Last line ends with `?`, `:`, `>`, or `]`
 
 When detection occurs, the response includes:
@@ -30,10 +32,21 @@ When detection occurs, the response includes:
 - Confidence level for each
 - Suggested actions to take
 
-**Avoiding interactive prompts**:
-- Use `DEBIAN_FRONTEND=noninteractive` for apt-get BEFORE any config files are modified
-- Use `-y` flag for package managers: `apt-get install -y`, `yum install -y`
+**Automatic non-interactive mode**:
+Commands are automatically wrapped with non-interactive flags/environment variables when possible:
+- apt/apt-get: `DEBIAN_FRONTEND=noninteractive` + `-y` flag
+- git clone/fetch/pull/push: `GIT_TERMINAL_PROMPT=0` + SSH BatchMode
+- npm/yarn/pnpm/bun install: `CI=true` environment
+- pip install: `PIP_NO_INPUT=1`
+- yum/dnf: `-y` flag
+- pacman: `--noconfirm` flag
+- brew: `NONINTERACTIVE=1`
+- terraform apply/destroy: `-auto-approve` flag
+- And many more (ssh, scp, composer, ansible, etc.)
+
+**Manual fallback for interactive prompts**:
 - For dpkg config conflicts, respond with `N<Enter>` to keep your version or `Y<Enter>` to use package version
+- Use `shell_interact` with appropriate response when automatic wrapping doesn't cover the case
 
 **Example**: `shell_execute("npm install express")`
 

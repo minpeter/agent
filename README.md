@@ -2,13 +2,6 @@
 
 A code-editing agent built with Vercel AI SDK and FriendliAI provider, following the architecture described in [ampcode.com/how-to-build-an-agent](https://ampcode.com/how-to-build-an-agent).
 
-## Features
-
-- **read_file**: Read the contents of a file
-- **list_files**: List files and directories recursively
-- **edit_file**: Edit files by string replacement, or create new files
-- **run_command**: Execute safe shell commands
-
 ## Requirements
 
 - [Bun](https://bun.sh) >= 1.0
@@ -22,7 +15,7 @@ Run directly without installation:
 
 ```bash
 export FRIENDLI_TOKEN=your_token_here
-bunx github:minpeter/agent
+bunx github:minpeter/agent#main
 ```
 
 ### Global Installation
@@ -60,13 +53,6 @@ export FRIENDLI_TOKEN=your_token_here
 bun start
 ```
 
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `FRIENDLI_TOKEN` | Yes | Your FriendliAI API token |
-| `DEBUG_CHUNK_LOG` | No | Enable debug logging (`true`, `1`, `yes`, `on`) |
-
 ## Usage
 
 ```
@@ -92,38 +78,6 @@ Available commands:
   /quit              - Exit the program
 
 You: ^C
-```
-
-## Project Structure
-
-```
-code-editing-agent/
-├── package.json
-├── tsconfig.json
-├── src/
-│   ├── index.ts           # CLI entry point
-│   ├── agent.ts           # Agent class with conversation management
-│   ├── env.ts             # Type-safe environment variables
-│   ├── commands/
-│   │   └── index.ts       # Slash command handlers
-│   ├── middleware/
-│   │   └── trim-leading-newlines.ts
-│   ├── model/
-│   │   └── create-model.ts
-│   ├── prompts/
-│   │   └── system.ts      # System prompt
-│   ├── tools/
-│   │   ├── index.ts       # Tool exports
-│   │   ├── read-file.ts   # File reading tool
-│   │   ├── list-files.ts  # Directory listing tool
-│   │   ├── edit-file.ts   # File editing tool
-│   │   └── run-command.ts # Command execution tool
-│   └── utils/
-│       ├── colors.ts      # ANSI color output utilities
-│       ├── conversation-store.ts
-│       ├── file-safety.ts
-│       ├── model-selector.ts
-│       └── retry.ts
 ```
 
 ## Model

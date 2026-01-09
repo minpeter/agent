@@ -3,7 +3,11 @@ import {
   formatBackgroundMessage,
   formatTerminalScreen,
   formatTimeoutMessage,
-} from "./format-utils";
+} from "./format-utils.js";
+import {
+  buildEnvPrefix,
+  wrapCommandNonInteractive,
+} from "./noninteractive-wrapper.js";
 
 const SESSION_PREFIX = "cea";
 const DEFAULT_TIMEOUT_MS = 180_000;
@@ -391,9 +395,14 @@ class SharedTmuxSession {
 
     this.previousBuffer = this.capturePane(true);
 
-    let fullCommand = command;
+    const wrapperResult = wrapCommandNonInteractive(command);
+    const wrappedCommand = wrapperResult.wrapped
+      ? `${buildEnvPrefix(wrapperResult.env)}${wrapperResult.command}`
+      : command;
+
+    let fullCommand = wrappedCommand;
     if (workdir) {
-      fullCommand = `cd ${escapeShellArg(workdir)} && ${command}`;
+      fullCommand = `cd ${escapeShellArg(workdir)} && ${wrappedCommand}`;
     }
 
     if (this.endsWithBackgroundOperator(fullCommand)) {

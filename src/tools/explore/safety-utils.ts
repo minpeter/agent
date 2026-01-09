@@ -190,6 +190,102 @@ export function clearIgnoreCache(): void {
 
 const WHITESPACE_REGEX = /\s+/;
 
+export function formatNumberedLines(
+  lines: string[],
+  startLine1: number
+): string {
+  return lines
+    .map((line, i) => {
+      const lineNum = startLine1 + i;
+      return `  ${String(lineNum).padStart(4)} | ${line}`;
+    })
+    .join("\n");
+}
+
+export function formatBlock(title: string, body: string): string {
+  return `======== ${title} ========\n${body}\n======== end ========`;
+}
+
+export interface LineWindow {
+  startLine1: number;
+  endLine1: number;
+}
+
+export function computeLineWindow(params: {
+  aroundLine1: number;
+  before: number;
+  after: number;
+  totalLines: number;
+}): LineWindow {
+  const { aroundLine1, before, after, totalLines } = params;
+  const startLine1 = Math.max(1, aroundLine1 - before);
+  const endLine1 = Math.min(totalLines, aroundLine1 + after);
+  return { startLine1, endLine1 };
+}
+
+export interface ReadFileResultEnhanced {
+  content: string;
+  numberedContent: string;
+  totalLines: number;
+  startLine1: number;
+  endLine1: number;
+  truncated: boolean;
+  bytes: number;
+}
+
+export async function safeReadFileEnhanced(
+  path: string,
+  options?: ReadFileOptions & {
+    around_line?: number;
+    before?: number;
+    after?: number;
+  }
+): Promise<ReadFileResultEnhanced> {
+  const check = await checkFileReadable(path);
+  if (!check.allowed) {
+    throw new Error(check.reason);
+  }
+
+  const rawContent = await readFile(path, "utf-8");
+  const allLines = rawContent.split("\n");
+  const totalLines = allLines.length;
+  const bytes = Buffer.byteLength(rawContent, "utf-8");
+
+  let startLine1: number;
+  let endLine1: number;
+
+  if (options?.around_line !== undefined) {
+    const before = options.before ?? 5;
+    const after = options.after ?? 10;
+    const window = computeLineWindow({
+      aroundLine1: options.around_line,
+      before,
+      after,
+      totalLines,
+    });
+    startLine1 = window.startLine1;
+    endLine1 = window.endLine1;
+  } else {
+    const offset = options?.offset ?? 0;
+    const limit = options?.limit ?? MAX_LINES;
+    startLine1 = Math.min(offset + 1, totalLines);
+    endLine1 = Math.min(offset + limit, totalLines);
+  }
+
+  const selectedLines = allLines.slice(startLine1 - 1, endLine1);
+  const truncated = endLine1 < totalLines || startLine1 > 1;
+
+  return {
+    content: selectedLines.join("\n"),
+    numberedContent: formatNumberedLines(selectedLines, startLine1),
+    totalLines,
+    startLine1,
+    endLine1,
+    truncated,
+    bytes,
+  };
+}
+
 const ALLOWED_COMMANDS = new Set([
   "node",
   "npm",

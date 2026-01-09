@@ -1,7 +1,79 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { mkdir, stat, writeFile } from "node:fs/promises";
+import { basename, dirname } from "node:path";
 import { tool } from "ai";
 import { z } from "zod";
+
+const PREVIEW_LINES = 3;
+
+function formatPreview(content: string): string {
+  const lines = content.split("\n");
+  const totalLines = lines.length;
+
+  if (totalLines <= PREVIEW_LINES * 2) {
+    return lines
+      .map((line, i) => `  ${String(i + 1).padStart(4)} | ${line}`)
+      .join("\n");
+  }
+
+  const head = lines
+    .slice(0, PREVIEW_LINES)
+    .map((line, i) => `  ${String(i + 1).padStart(4)} | ${line}`)
+    .join("\n");
+
+  const tail = lines
+    .slice(-PREVIEW_LINES)
+    .map((line, i) => {
+      const lineNum = totalLines - PREVIEW_LINES + i + 1;
+      return `  ${String(lineNum).padStart(4)} | ${line}`;
+    })
+    .join("\n");
+
+  return `${head}\n       ... (${totalLines - PREVIEW_LINES * 2} lines omitted) ...\n${tail}`;
+}
+
+const inputSchema = z.object({
+  path: z.string().describe("File path (absolute or relative)"),
+  content: z.string().describe("Content to write"),
+});
+
+export type WriteFileInput = z.infer<typeof inputSchema>;
+
+export async function executeWriteFile({
+  path,
+  content,
+}: WriteFileInput): Promise<string> {
+  const dir = dirname(path);
+  if (dir !== ".") {
+    await mkdir(dir, { recursive: true });
+  }
+
+  let existed = false;
+  try {
+    await stat(path);
+    existed = true;
+  } catch {
+    existed = false;
+  }
+
+  await writeFile(path, content, "utf-8");
+
+  const lines = content.split("\n");
+  const lineCount = lines.length;
+  const byteCount = Buffer.byteLength(content, "utf-8");
+  const fileName = basename(path);
+  const action = existed ? "overwrote" : "created";
+
+  const output = [
+    `OK - ${action} ${fileName}`,
+    `bytes: ${byteCount}, lines: ${lineCount}`,
+    "",
+    `======== ${fileName} (preview) ========`,
+    formatPreview(content),
+    "======== end ========",
+  ];
+
+  return output.join("\n");
+}
 
 export const writeFileTool = tool({
   description:
@@ -9,17 +81,6 @@ export const writeFileTool = tool({
     "Creates parent directories automatically. " +
     "Use edit_file for surgical changes to existing files.",
   needsApproval: true,
-  inputSchema: z.object({
-    path: z.string().describe("File path (absolute or relative)"),
-    content: z.string().describe("Content to write"),
-  }),
-  execute: async ({ path, content }) => {
-    const dir = dirname(path);
-    if (dir !== ".") {
-      await mkdir(dir, { recursive: true });
-    }
-
-    await writeFile(path, content, "utf-8");
-    return `Successfully wrote ${content.length} characters to ${path}`;
-  },
+  inputSchema,
+  execute: executeWriteFile,
 });

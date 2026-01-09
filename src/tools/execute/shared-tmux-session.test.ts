@@ -147,7 +147,10 @@ describe("SharedTmuxSession", () => {
       });
 
       expect(result.exitCode).toBe(124);
-      expect(result.output).toContain("timed out");
+      const hasTimeoutOrInteractivePrompt =
+        result.output.includes("timed out") ||
+        result.output.includes("[INTERACTIVE PROMPT DETECTED]");
+      expect(hasTimeoutOrInteractivePrompt).toBe(true);
     });
   });
 

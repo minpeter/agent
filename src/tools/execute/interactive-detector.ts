@@ -1,4 +1,9 @@
 import { spawnSync } from "node:child_process";
+import {
+  detectLinuxProcTtyWait,
+  isLinuxPlatform,
+} from "./linux-proc-detector.js";
+import { detectOutputStallSync } from "./output-stall-detector.js";
 
 const WHITESPACE_SPLIT = /\s+/;
 const SHELL_PROMPT_ONLY = /^\s*[$#%]\s*$/;
@@ -9,7 +14,9 @@ export type DetectionMethod =
   | "regex_pattern"
   | "process_state"
   | "last_line_prompt"
-  | "cursor_at_prompt";
+  | "cursor_at_prompt"
+  | "linux_proc_tty_wait"
+  | "output_stall";
 
 export interface DetectionResult {
   detected: boolean;
@@ -301,6 +308,49 @@ function detectByCursorPosition(
   }
 }
 
+function detectByLinuxProc(sessionId: string): DetectionResult | null {
+  if (!isLinuxPlatform()) {
+    return null;
+  }
+
+  const procResult = detectLinuxProcTtyWait(sessionId);
+  if (!procResult?.detected) {
+    return null;
+  }
+
+  return {
+    detected: true,
+    method: "linux_proc_tty_wait",
+    confidence: procResult.confidence,
+    detail: procResult.detail,
+    suggestedActions: [
+      "Process is waiting for TTY input (detected via /proc)",
+      "Check terminal screen for prompts",
+      "Use <Ctrl+C> to interrupt if stuck",
+    ],
+  };
+}
+
+function detectByOutputStall(sessionId: string): DetectionResult | null {
+  const stallResult = detectOutputStallSync(sessionId, 2, 300);
+
+  if (!stallResult.isStalled) {
+    return null;
+  }
+
+  return {
+    detected: true,
+    method: "output_stall",
+    confidence: stallResult.confidence,
+    detail: stallResult.detail,
+    suggestedActions: [
+      "Terminal output has stalled - may be waiting for input",
+      "Check terminal screen for prompts",
+      "Use <Ctrl+C> to interrupt if stuck",
+    ],
+  };
+}
+
 export function detectInteractivePrompt(
   context: DetectionContext
 ): DetectionResult[] {
@@ -313,6 +363,11 @@ export function detectInteractivePrompt(
   }
 
   if (sessionId) {
+    const linuxProcResult = detectByLinuxProc(sessionId);
+    if (linuxProcResult) {
+      results.push(linuxProcResult);
+    }
+
     const processResult = detectByProcessState(sessionId);
     if (processResult) {
       results.push(processResult);
@@ -321,6 +376,11 @@ export function detectInteractivePrompt(
     const cursorResult = detectByCursorPosition(terminalContent, sessionId);
     if (cursorResult) {
       results.push(cursorResult);
+    }
+
+    const stallResult = detectByOutputStall(sessionId);
+    if (stallResult) {
+      results.push(stallResult);
     }
   }
 

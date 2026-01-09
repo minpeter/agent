@@ -2,64 +2,99 @@ import { stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tool } from "ai";
 import { z } from "zod";
-import { getIgnoreFilter } from "./safety-utils";
+import { formatBlock, getIgnoreFilter } from "./safety-utils";
+
+const MAX_RESULTS = 500;
 
 interface FileWithMtime {
   path: string;
-  mtime: number;
+  mtime: Date;
+}
+
+const inputSchema = z.object({
+  pattern: z.string().describe("Glob pattern (e.g., '**/*.py', 'docs/*.md')"),
+  path: z
+    .string()
+    .optional()
+    .describe("Directory to search (default: current directory)"),
+  respect_git_ignore: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe("Respect .gitignore (default: true)"),
+});
+
+export type GlobInput = z.input<typeof inputSchema>;
+
+export async function executeGlob({
+  pattern,
+  path,
+  respect_git_ignore = true,
+}: GlobInput): Promise<string> {
+  const searchDir = path ? resolve(path) : process.cwd();
+
+  const glob = new Bun.Glob(pattern);
+  const filesWithMtime: FileWithMtime[] = [];
+
+  const ignoreFilter = respect_git_ignore ? await getIgnoreFilter() : null;
+
+  for await (const file of glob.scan({
+    cwd: searchDir,
+    absolute: false,
+    onlyFiles: true,
+  })) {
+    if (ignoreFilter?.ignores(file)) {
+      continue;
+    }
+
+    const absolutePath = join(searchDir, file);
+    try {
+      const stats = await stat(absolutePath);
+      filesWithMtime.push({
+        path: absolutePath,
+        mtime: stats.mtime,
+      });
+    } catch {}
+  }
+
+  filesWithMtime.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+
+  const truncated = filesWithMtime.length > MAX_RESULTS;
+  const displayFiles = truncated
+    ? filesWithMtime.slice(0, MAX_RESULTS)
+    : filesWithMtime;
+
+  const output = [
+    filesWithMtime.length > 0 ? "OK - glob" : "OK - glob (no matches)",
+    `pattern: "${pattern}"`,
+    `path: ${path ?? "."}`,
+    `respect_git_ignore: ${respect_git_ignore}`,
+    `file_count: ${filesWithMtime.length}`,
+    `truncated: ${truncated}`,
+    "sorted_by: mtime desc",
+    "",
+  ];
+
+  if (displayFiles.length > 0) {
+    const body = displayFiles
+      .map((f, i) => {
+        const num = String(i + 1).padStart(4);
+        const mtimeStr = f.mtime.toISOString();
+        return `${num} | ${f.path} | mtime: ${mtimeStr}`;
+      })
+      .join("\n");
+    output.push(formatBlock("glob results", body));
+  } else {
+    output.push(formatBlock("glob results", "(no matches)"));
+  }
+
+  return output.join("\n");
 }
 
 export const globTool = tool({
   description:
     "Find files by pattern (e.g., '**/*.ts', 'src/**/*.json'). " +
-    "Returns absolute paths sorted by modification time (newest first).",
-  inputSchema: z.object({
-    pattern: z.string().describe("Glob pattern (e.g., '**/*.py', 'docs/*.md')"),
-    path: z
-      .string()
-      .optional()
-      .describe("Directory to search (default: current directory)"),
-    respect_git_ignore: z
-      .boolean()
-      .optional()
-      .default(true)
-      .describe("Respect .gitignore (default: true)"),
-  }),
-  execute: async ({ pattern, path, respect_git_ignore }) => {
-    const searchDir = path ? resolve(path) : process.cwd();
-
-    const glob = new Bun.Glob(pattern);
-    const filesWithMtime: FileWithMtime[] = [];
-
-    const ignoreFilter = respect_git_ignore ? await getIgnoreFilter() : null;
-
-    for await (const file of glob.scan({
-      cwd: searchDir,
-      absolute: false,
-      onlyFiles: true,
-    })) {
-      if (ignoreFilter?.ignores(file)) {
-        continue;
-      }
-
-      const absolutePath = join(searchDir, file);
-      try {
-        const stats = await stat(absolutePath);
-        filesWithMtime.push({
-          path: absolutePath,
-          mtime: stats.mtimeMs,
-        });
-      } catch {
-        // File might have been deleted between scan and stat, skip it
-      }
-    }
-
-    // Sort by modification time (newest first)
-    filesWithMtime.sort((a, b) => b.mtime - a.mtime);
-
-    // Return only the paths
-    const result = filesWithMtime.map((f) => f.path);
-
-    return JSON.stringify(result);
-  },
+    "Returns paths sorted by modification time (newest first) with mtime.",
+  inputSchema,
+  execute: executeGlob,
 });
