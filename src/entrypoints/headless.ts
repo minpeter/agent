@@ -2,6 +2,7 @@
 
 import { agentManager, DEFAULT_MODEL_ID } from "../agent";
 import { MessageHistory } from "../context/message-history";
+import { setSessionId } from "../context/session";
 import { env } from "../env";
 import { cleanupSession } from "../tools/execute/shared-tmux-session";
 
@@ -248,6 +249,8 @@ const processAgentResponse = async (
 
 const run = async (): Promise<void> => {
   const { prompt, model, thinking, toolFallback } = parseArgs();
+
+  setSessionId(sessionId);
 
   agentManager.setHeadlessMode(true);
   agentManager.setModelId(model || DEFAULT_MODEL_ID);

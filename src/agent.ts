@@ -5,6 +5,10 @@ import { getEnvironmentContext } from "./context/environment-context";
 import { SYSTEM_PROMPT } from "./context/system-prompt";
 import { env } from "./env";
 import { buildMiddlewares } from "./middleware";
+import {
+  buildTodoContinuationPrompt,
+  getIncompleteTodos,
+} from "./middleware/todo-continuation";
 import { tools } from "./tools";
 
 export const DEFAULT_MODEL_ID = "Qwen/Qwen3-235B-A22B-Thinking-2507";
@@ -107,18 +111,25 @@ class AgentManager {
     return this.toolFallbackEnabled;
   }
 
-  getInstructions(): string {
-    return SYSTEM_PROMPT + getEnvironmentContext();
+  async getInstructions(): Promise<string> {
+    let instructions = SYSTEM_PROMPT + getEnvironmentContext();
+
+    const incompleteTodos = await getIncompleteTodos();
+    if (incompleteTodos.length > 0) {
+      instructions += `\n\n${buildTodoContinuationPrompt(incompleteTodos)}`;
+    }
+
+    return instructions;
   }
 
   getTools() {
     return tools;
   }
 
-  stream(messages: ModelMessage[]) {
+  async stream(messages: ModelMessage[]) {
     const agent = createAgent(this.modelId, {
       disableApproval: this.headlessMode,
-      instructions: this.getInstructions(),
+      instructions: await this.getInstructions(),
       enableThinking: this.thinkingEnabled,
       enableToolFallback: this.toolFallbackEnabled,
     });

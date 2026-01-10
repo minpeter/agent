@@ -123,12 +123,14 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   ]);
 }
 
-export const createRenderCommand = (getData: () => RenderData): Command => ({
+export const createRenderCommand = (
+  getData: () => RenderData | Promise<RenderData>
+): Command => ({
   name: "render",
   description: "Render conversation as raw prompt text",
   execute: async (): Promise<CommandResult> => {
     const spinner = new Spinner("Rendering prompt...");
-    const data = getData();
+    const data = await getData();
 
     if (data.messages.length === 0) {
       return { success: false, message: "No messages to render." };
