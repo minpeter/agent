@@ -3,6 +3,7 @@ import type { ModelMessage, ToolSet } from "ai";
 import { generateText, wrapLanguageModel } from "ai";
 import type { ModelType } from "../agent";
 import { env } from "../env";
+import { colors } from "../interaction/colors";
 import { Spinner } from "../interaction/spinner";
 import { buildMiddlewares } from "../middleware";
 import type { Command, CommandResult } from "./types";
@@ -154,7 +155,10 @@ export const createRenderCommand = (
       spinner.start();
       const text = await withTimeout(renderChatPrompt(data), RENDER_TIMEOUT_MS);
       spinner.stop();
-      return { success: true, message: text || "(empty render result)" };
+      const styledText = text
+        ? `${colors.dim}${text}${colors.reset}`
+        : "(empty render result)";
+      return { success: true, message: styledText };
     } catch (error) {
       spinner.stop();
       const errorMessage =
