@@ -1,8 +1,10 @@
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { glob } from "glob";
 
-const SKILLS_DIR = ".claude/skills";
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SKILLS_DIR = join(__dirname, "../skills");
 
 interface SkillMetadata {
   name: string;

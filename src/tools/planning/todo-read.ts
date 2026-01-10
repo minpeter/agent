@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getSessionId } from "../../context/session";
 import type { TodoItem } from "./todo-write";
 
-const TODO_DIR = ".sisyphus/todos";
+const TODO_DIR = ".cea/todos";
 
 const inputSchema = z.object({});
 

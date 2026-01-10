@@ -1,9 +1,11 @@
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { tool } from "ai";
 import { z } from "zod";
 
-const SKILLS_DIR = ".claude/skills";
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SKILLS_DIR = join(__dirname, "../../skills");
 
 const inputSchema = z.object({
   skillName: z
@@ -17,15 +19,14 @@ export type LoadSkillInput = z.infer<typeof inputSchema>;
 export async function executeLoadSkill({
   skillName,
 }: LoadSkillInput): Promise<string> {
-  const cwd = process.cwd();
-  const skillPath = join(cwd, SKILLS_DIR, `${skillName}.md`);
+  const skillPath = join(SKILLS_DIR, `${skillName}.md`);
 
   try {
     const content = await readFile(skillPath, "utf-8");
     return `# Skill Loaded: ${skillName}\n\n${content}`;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return `Error: Skill '${skillName}' not found. Available skills can be found in ${SKILLS_DIR}/`;
+      return `Error: Skill '${skillName}' not found. This skill is not bundled with the package.`;
     }
     throw error;
   }

@@ -4,7 +4,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { getSessionId } from "../../context/session";
 
-const TODO_DIR = ".sisyphus/todos";
+const TODO_DIR = ".cea/todos";
 
 const todoItemSchema = z.object({
   id: z.string().describe("Unique identifier for the todo item"),

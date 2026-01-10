@@ -53,18 +53,4 @@ todo_write({
 ```
 
 **Auto-continuation:**
-If conversation ends with incomplete todos, they will automatically continue in the next message.
-
-## todo_read
-
-Check current todo list status and progress.
-
-**When to use:**
-- Before continuing work to check what's left
-- To verify task completion
-- To show progress to user
-
-**Output:**
-- Statistics (total, completed, in_progress, pending, cancelled)
-- Full task list with status indicators
-- Last update timestamp
+If conversation ends with incomplete todos, they will automatically continue in the next message. You don't need to manually check the todo list - the system will automatically remind you of incomplete tasks.
