@@ -26,12 +26,20 @@ export async function getIncompleteTodos(): Promise<TodoItem[]> {
 
   try {
     await stat(todoPath);
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
+
+  let data: TodoData;
+  try {
+    const content = await readFile(todoPath, "utf-8");
+    data = JSON.parse(content);
   } catch {
     return [];
   }
-
-  const content = await readFile(todoPath, "utf-8");
-  const data: TodoData = JSON.parse(content);
 
   return data.todos.filter(
     (t) => t.status !== "completed" && t.status !== "cancelled"
@@ -39,14 +47,16 @@ export async function getIncompleteTodos(): Promise<TodoItem[]> {
 }
 
 export function buildTodoContinuationPrompt(todos: TodoItem[]): string {
+  const statusEmojiMap: Record<string, string> = {
+    in_progress: "🔄",
+    pending: "📋",
+    completed: "✅",
+    cancelled: "❌",
+  };
+
   const taskList = todos
     .map((t, i) => {
-      let statusEmoji = "⚠️";
-      if (t.status === "in_progress") {
-        statusEmoji = "🔄";
-      } else if (t.status === "pending") {
-        statusEmoji = "📋";
-      }
+      const statusEmoji = statusEmojiMap[t.status] ?? "⚠️";
       return `${i + 1}. ${statusEmoji} [${t.status.toUpperCase()}] ${t.content} (priority: ${t.priority})`;
     })
     .join("\n");

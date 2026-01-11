@@ -9,7 +9,7 @@ export const createClearCommand = (
   execute: (_context: CommandContext): CommandResult => {
     messageHistory.clear();
     // Clear terminal screen (equivalent to Ctrl+L)
-    process.stdout.write('\x1b[2J\x1b[H');
+    process.stdout.write("\x1b[2J\x1b[H");
     return {
       success: true,
       message: "Conversation history and terminal cleared.",

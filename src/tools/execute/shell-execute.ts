@@ -72,7 +72,10 @@ export const shellExecuteTool = tool({
   needsApproval: true,
 
   execute: async ({ command, workdir, timeout_ms }): Promise<ToolOutput> => {
-    const result = await executeCommand(command, { workdir, timeoutMs: timeout_ms });
+    const result = await executeCommand(command, {
+      workdir,
+      timeoutMs: timeout_ms,
+    });
     return {
       exit_code: result.exitCode,
       output: result.output,

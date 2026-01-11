@@ -6,6 +6,13 @@ import { glob } from "glob";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SKILLS_DIR = join(__dirname, "../skills");
 
+const FRONTMATTER_REGEX = /^---\n([\s\S]*?)\n---/;
+const NAME_REGEX = /^name:\s*(.+)$/m;
+const DESC_REGEX = /^description:\s*(.+)$/m;
+const VERSION_REGEX = /^version:\s*(.+)$/m;
+const TRIGGERS_REGEX = /^triggers:\s*\n((?:\s{2}- .+\n?)+)/m;
+const LIST_ITEM_REGEX = /^\s*-\s*/;
+
 interface SkillMetadata {
   name: string;
   description: string;
@@ -14,8 +21,7 @@ interface SkillMetadata {
 }
 
 function parseFrontmatter(content: string): SkillMetadata | null {
-  const frontmatterRegex = /^---\n([\s\S]*?)\n---/;
-  const match = content.match(frontmatterRegex);
+  const match = content.match(FRONTMATTER_REGEX);
 
   if (!match) {
     return null;
@@ -24,30 +30,30 @@ function parseFrontmatter(content: string): SkillMetadata | null {
   const frontmatter = match[1];
   const metadata: Partial<SkillMetadata> = {};
 
-  const nameMatch = frontmatter.match(/^name:\s*(.+)$/m);
+  const nameMatch = frontmatter.match(NAME_REGEX);
   if (nameMatch) {
     metadata.name = nameMatch[1].trim();
   }
 
-  const descMatch = frontmatter.match(/^description:\s*(.+)$/m);
+  const descMatch = frontmatter.match(DESC_REGEX);
   if (descMatch) {
     metadata.description = descMatch[1].trim();
   }
 
-  const versionMatch = frontmatter.match(/^version:\s*(.+)$/m);
+  const versionMatch = frontmatter.match(VERSION_REGEX);
   if (versionMatch) {
     metadata.version = versionMatch[1].trim();
   }
 
-  const triggersMatch = frontmatter.match(/^triggers:\s*\n((?:  - .+\n?)+)/m);
+  const triggersMatch = frontmatter.match(TRIGGERS_REGEX);
   if (triggersMatch) {
     metadata.triggers = triggersMatch[1]
       .split("\n")
       .filter((line) => line.trim())
-      .map((line) => line.replace(/^\s*-\s*/, "").trim());
+      .map((line) => line.replace(LIST_ITEM_REGEX, "").trim());
   }
 
-  if (!metadata.name || !metadata.description) {
+  if (!(metadata.name && metadata.description)) {
     return null;
   }
 
