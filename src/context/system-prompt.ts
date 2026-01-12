@@ -63,6 +63,12 @@ ${PLANNING_TOOLS_CONTEXT}
 - **Handle errors gracefully**: Check command outputs and handle failures appropriately
 - **Be precise**: Use exact string matching in edit_file to avoid unintended changes
 
+### 5. Verification Before Completion
+- **ALWAYS run your code** before declaring the task complete
+- **Check for edge cases**: Consider what could go wrong and handle it
+- **Verify output format**: If the task specifies an output format, verify your output matches exactly
+- **Re-read requirements**: Before finishing, re-read the original task to ensure all requirements are met
+
 ---
 
 ## Workflow Example
@@ -72,7 +78,8 @@ ${PLANNING_TOOLS_CONTEXT}
 2. Use read_file to understand current implementation
 3. Use grep to find related code patterns
 4. Use edit_file to make surgical changes
-5. Use shell_execute to run tests and verify
+5. Use shell_execute to run your code and verify it works
+6. Check the output matches what was requested
 
 **Bad workflow**:
 ❌ Using shell_execute with cat instead of read_file

@@ -14,7 +14,7 @@ export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
 echo "Cloning code-editing-agent..."
-git clone --depth 1 --single-branch https://github.com/minpeter/code-editing-agent.git /agent
+git clone --depth 1 --single-branch --branch auto-agent-optimizer-ralph-loop https://github.com/minpeter/code-editing-agent.git /agent
 cd /agent
 
 echo "Installing npm dependencies..."
