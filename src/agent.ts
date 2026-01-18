@@ -12,7 +12,7 @@ import {
 } from "./middleware/todo-continuation";
 import { tools } from "./tools";
 
-export const DEFAULT_MODEL_ID = "Qwen/Qwen3-235B-A22B-Thinking-2507";
+export const DEFAULT_MODEL_ID = "MiniMaxAI/MiniMax-M2.1";
 const OUTPUT_TOKEN_MAX = 64_000;
 
 const friendli = createFriendli({
