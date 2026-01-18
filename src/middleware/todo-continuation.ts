@@ -46,20 +46,23 @@ export async function getIncompleteTodos(): Promise<TodoItem[]> {
   );
 }
 
-export function buildTodoContinuationPrompt(todos: TodoItem[]): string {
-  const statusEmojiMap: Record<string, string> = {
-    in_progress: "🔄",
-    pending: "📋",
-    completed: "✅",
-    cancelled: "❌",
-  };
+const STATUS_EMOJI_MAP: Record<TodoItem["status"], string> = {
+  in_progress: "🔄",
+  pending: "📋",
+  completed: "✅",
+  cancelled: "❌",
+};
 
-  const taskList = todos
+const buildTodoTaskList = (todos: TodoItem[]): string =>
+  todos
     .map((t, i) => {
-      const statusEmoji = statusEmojiMap[t.status] ?? "⚠️";
+      const statusEmoji = STATUS_EMOJI_MAP[t.status] ?? "⚠️";
       return `${i + 1}. ${statusEmoji} [${t.status.toUpperCase()}] ${t.content} (priority: ${t.priority})`;
     })
     .join("\n");
+
+export function buildTodoContinuationPrompt(todos: TodoItem[]): string {
+  const taskList = buildTodoTaskList(todos);
 
   return `
 
@@ -101,4 +104,21 @@ You are autonomous. Execute tasks, do not just describe them.
 
 ---
 `.trim();
+}
+
+export function buildTodoContinuationUserMessage(todos: TodoItem[]): string {
+  const taskList = buildTodoTaskList(todos);
+
+  return [
+    "[SYSTEM REMINDER - TODO CONTINUATION]",
+    "",
+    `You have ${todos.length} incomplete task(s):`,
+    "",
+    taskList,
+    "",
+    "Continue executing the tasks now. Update statuses with todo_write.",
+    "Do not stop until all tasks are completed.",
+  ]
+    .join("\n")
+    .trim();
 }

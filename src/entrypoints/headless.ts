@@ -4,6 +4,10 @@ import { agentManager, DEFAULT_MODEL_ID } from "../agent";
 import { MessageHistory } from "../context/message-history";
 import { setSessionId } from "../context/session";
 import { env } from "../env";
+import {
+  buildTodoContinuationUserMessage,
+  getIncompleteTodos,
+} from "../middleware/todo-continuation";
 import { cleanupSession } from "../tools/execute/shared-tmux-session";
 
 interface BaseEvent {
@@ -59,6 +63,7 @@ process.on("SIGINT", () => {
 });
 
 const startTime = Date.now();
+const TODO_CONTINUATION_MAX_LOOPS = 5;
 
 const emitEvent = (event: TrajectoryEvent): void => {
   console.log(JSON.stringify(event));
@@ -270,6 +275,36 @@ const run = async (): Promise<void> => {
 
   try {
     await processAgentResponse(messageHistory);
+
+    let continuationCount = 0;
+    while (continuationCount <= TODO_CONTINUATION_MAX_LOOPS) {
+      const incompleteTodos = await getIncompleteTodos();
+      if (incompleteTodos.length === 0) {
+        break;
+      }
+
+      if (continuationCount === TODO_CONTINUATION_MAX_LOOPS) {
+        emitEvent({
+          timestamp: new Date().toISOString(),
+          type: "error",
+          sessionId,
+          error:
+            "Auto-continue limit reached with incomplete todos. Awaiting new input.",
+        });
+        break;
+      }
+
+      const reminder = buildTodoContinuationUserMessage(incompleteTodos);
+      emitEvent({
+        timestamp: new Date().toISOString(),
+        type: "user",
+        sessionId,
+        content: reminder,
+      });
+      messageHistory.addUserMessage(reminder);
+      continuationCount += 1;
+      await processAgentResponse(messageHistory);
+    }
   } catch (error) {
     emitEvent({
       timestamp: new Date().toISOString(),

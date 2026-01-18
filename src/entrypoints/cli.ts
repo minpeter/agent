@@ -15,6 +15,10 @@ import { env } from "../env";
 import { colorize } from "../interaction/colors";
 import { renderFullStream } from "../interaction/stream-renderer";
 import { askBatchApproval } from "../interaction/tool-approval";
+import {
+  buildTodoContinuationUserMessage,
+  getIncompleteTodos,
+} from "../middleware/todo-continuation";
 import { cleanupSession } from "../tools/execute/shared-tmux-session";
 
 // Bracketed paste mode escape sequences
@@ -31,6 +35,8 @@ const messageHistory = new MessageHistory();
 
 let rlInstance: ReadlineInterface | null = null;
 let shouldExit = false;
+
+const TODO_CONTINUATION_MAX_LOOPS = 5;
 
 process.on("exit", () => {
   if (env.DEBUG_TMUX_CLEANUP) {
@@ -118,7 +124,30 @@ const handleCommandExecution = async (command: string): Promise<void> => {
 
 const handleAgentResponse = async (rl: ReadlineInterface): Promise<void> => {
   try {
-    await processAgentResponse(rl);
+    let continuationCount = 0;
+
+    while (continuationCount <= TODO_CONTINUATION_MAX_LOOPS) {
+      await processAgentResponse(rl);
+
+      const incompleteTodos = await getIncompleteTodos();
+      if (incompleteTodos.length === 0) {
+        return;
+      }
+
+      if (continuationCount === TODO_CONTINUATION_MAX_LOOPS) {
+        console.log(
+          colorize(
+            "yellow",
+            "[todo] Auto-continue limit reached; waiting for input."
+          )
+        );
+        return;
+      }
+
+      const reminder = buildTodoContinuationUserMessage(incompleteTodos);
+      messageHistory.addUserMessage(reminder);
+      continuationCount += 1;
+    }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`\nError: ${errorMessage}`);

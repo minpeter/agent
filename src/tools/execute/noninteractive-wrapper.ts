@@ -237,15 +237,15 @@ function getBaseEnv(): Record<string, string> {
   };
 
   if (isWindows()) {
-    baseEnv["GIT_PAGER"] = "more";
-    baseEnv["PAGER"] = "more";
+    baseEnv.GIT_PAGER = "more";
+    baseEnv.PAGER = "more";
   } else {
-    baseEnv["TERM"] = "dumb";
-    baseEnv["DEBIAN_FRONTEND"] = "noninteractive";
-    baseEnv["GIT_PAGER"] = "cat";
-    baseEnv["PAGER"] = "cat";
-    baseEnv["LESS"] = "-FX";
-    baseEnv["LC_ALL"] = "en_US.UTF-8";
+    baseEnv.TERM = "dumb";
+    baseEnv.DEBIAN_FRONTEND = "noninteractive";
+    baseEnv.GIT_PAGER = "cat";
+    baseEnv.PAGER = "cat";
+    baseEnv.LESS = "-FX";
+    baseEnv.LC_ALL = "en_US.UTF-8";
   }
 
   return baseEnv;
