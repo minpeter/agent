@@ -1163,7 +1163,6 @@ const collectMultilineInput = (
                 : state.suggestions.length - 1;
           } else if (commandHistory.length > 0) {
             // Navigate command history
-            console.log(`[DEBUG] Up pressed, history length: ${commandHistory.length}, current index: ${state.historyIndex}`);
             if (state.historyIndex === -1) {
               // Start browsing history - save current input
               state.originalBuffer = state.buffer;
@@ -1175,7 +1174,6 @@ const collectMultilineInput = (
             if (state.historyIndex >= 0) {
               state.buffer = commandHistory[state.historyIndex];
               state.cursor = splitGraphemes(state.buffer).length;
-              console.log(`[DEBUG] Loaded history[${state.historyIndex}]: "${state.buffer}"`);
             }
           }
           break;
