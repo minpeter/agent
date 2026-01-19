@@ -147,9 +147,11 @@ export class MessageHistory {
       };
     });
 
+    // Type assertion is safe here because we're only modifying the output field
+    // and maintaining the same structure as the input content array
     return {
       ...message,
-      content: sanitizedContent as any,
+      content: sanitizedContent as typeof message.content,
     };
   }
 
