@@ -95,7 +95,7 @@
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.27.2", "", { "os": "win32", "cpu": "x64" }, "sha512-sRdU18mcKf7F+YgheI/zGf5alZatMUTKj/jNS6l744f9u3WFu4v7twcUI9vu4mknF4Y9aDlblIie0IM+5xxaqQ=="],
 
-    "@friendliai/ai-provider": ["@friendliai/ai-provider@1.0.4", "", { "dependencies": { "@ai-sdk/openai-compatible": "2.0.9", "@ai-sdk/provider": "3.0.2", "@ai-sdk/provider-utils": "4.0.5" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.12" } }, "sha512-I0ca102rmc1Jns7YNq+DqD1nlBcaRwUjbKSssOAh1xHutLhl5C6PkcgXoJTB/i/dGmw8Y7k4/eJr28sIb7Sx1Q=="],
+    "@friendliai/ai-provider": ["@friendliai/ai-provider@1.1.0", "", { "dependencies": { "@ai-sdk/openai-compatible": "2.0.9", "@ai-sdk/provider": "3.0.2", "@ai-sdk/provider-utils": "4.0.5" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.12" } }, "sha512-LK9J2ltCC6uPL10JCTpyD5BjOtzrokLF0gGodScBTL+iqm9izcWImiB/u4lTSZd2eD5N7SLHO0lw8BenXLCkjg=="],
 
     "@isaacs/balanced-match": ["@isaacs/balanced-match@4.0.1", "", {}, "sha512-yzMTt9lEb8Gv7zRioUilSglI0c0smZ9k5D65677DLWLtWJaXIS3CqcGyUFByYKlnUj6TkjLVs54fBl6+TiGQDQ=="],
 
