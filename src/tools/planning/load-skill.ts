@@ -49,8 +49,9 @@ async function loadSubFile(
   const relativeFromSkillDir = relative(realSkillDir, realFilePath);
   const isWithinSkillDir =
     relativeFromSkillDir === "" ||
-    (!relativeFromSkillDir.startsWith("..") &&
-      !isAbsolute(relativeFromSkillDir));
+    !(
+      relativeFromSkillDir.startsWith("..") || isAbsolute(relativeFromSkillDir)
+    );
 
   if (!isWithinSkillDir) {
     return `Error: Path '${relativePath}' resolves outside skill directory. This is not allowed.`;
@@ -110,10 +111,11 @@ export async function executeLoadSkill({
         return `Error: Skill '${skillName}' is a legacy format skill. Only v2 skills support subdirectory files.`;
       }
 
-      return loadSubFile(skillName, relativePath, {
-        ...info,
-        dirPath: info.dirPath,
-      });
+      return loadSubFile(
+        skillName,
+        relativePath,
+        info as SkillInfo & { dirPath: string }
+      );
     }
 
     // Load main skill file
