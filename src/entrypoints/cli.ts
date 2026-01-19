@@ -1156,16 +1156,48 @@ const collectMultilineInput = (
           break;
         case "up":
           if (state.suggestions.length > 0) {
+            // Navigate suggestions if available
             state.suggestionIndex =
               state.suggestionIndex > 0
                 ? state.suggestionIndex - 1
                 : state.suggestions.length - 1;
+          } else if (commandHistory.length > 0) {
+            // Navigate command history
+            console.log(`[DEBUG] Up pressed, history length: ${commandHistory.length}, current index: ${state.historyIndex}`);
+            if (state.historyIndex === -1) {
+              // Start browsing history - save current input
+              state.originalBuffer = state.buffer;
+              state.historyIndex = commandHistory.length - 1;
+            } else if (state.historyIndex > 0) {
+              state.historyIndex--;
+            }
+            // Load history entry
+            if (state.historyIndex >= 0) {
+              state.buffer = commandHistory[state.historyIndex];
+              state.cursor = splitGraphemes(state.buffer).length;
+              console.log(`[DEBUG] Loaded history[${state.historyIndex}]: "${state.buffer}"`);
+            }
           }
           break;
         case "down":
           if (state.suggestions.length > 0) {
+            // Navigate suggestions if available
             state.suggestionIndex =
               (state.suggestionIndex + 1) % state.suggestions.length;
+          } else if (state.historyIndex !== -1) {
+            // Navigate command history
+            console.log(`[DEBUG] Down pressed, current index: ${state.historyIndex}`);
+            if (state.historyIndex < commandHistory.length - 1) {
+              state.historyIndex++;
+              state.buffer = commandHistory[state.historyIndex];
+              console.log(`[DEBUG] Loaded history[${state.historyIndex}]: "${state.buffer}"`);
+            } else {
+              // Reached end of history - restore original input
+              state.historyIndex = -1;
+              state.buffer = state.originalBuffer;
+              console.log(`[DEBUG] Restored original buffer: "${state.buffer}"`);
+            }
+            state.cursor = splitGraphemes(state.buffer).length;
           }
           break;
         case "word-left":
@@ -1400,6 +1432,7 @@ const run = async (): Promise<void> => {
       if (trimmed.length > 0) {
         if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== trimmed) {
           commandHistory.push(trimmed);
+          console.log(`[DEBUG] Added to history: "${trimmed}", total: ${commandHistory.length}`);
         }
       }
 
