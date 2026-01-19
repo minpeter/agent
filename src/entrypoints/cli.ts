@@ -1396,6 +1396,13 @@ const run = async (): Promise<void> => {
 
       const trimmed = input.trim();
 
+      // Add to history (all inputs, not just commands)
+      if (trimmed.length > 0) {
+        if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== trimmed) {
+          commandHistory.push(trimmed);
+        }
+      }
+
       if (shouldExitFromInput(trimmed)) {
         break;
       }
