@@ -97,15 +97,89 @@ export class MessageHistory {
       const processedMessage = env.EXPERIMENTAL_TRIM_TRAILING_NEWLINES
         ? trimTrailingNewlines(modelMessage)
         : modelMessage;
+
+      // Serialize Error objects in tool results to prevent schema validation errors
+      const sanitizedMessage = this.sanitizeMessage(processedMessage);
+
       const message: Message = {
         id: createMessageId(),
         createdAt: new Date(),
-        modelMessage: processedMessage,
+        modelMessage: sanitizedMessage,
       };
       created.push(message);
     }
     this.messages.push(...created);
     return created;
+  }
+
+  private sanitizeMessage(message: ModelMessage): ModelMessage {
+    // Only process tool messages
+    if (message.role !== "tool") {
+      return message;
+    }
+
+    if (!Array.isArray(message.content)) {
+      return message;
+    }
+
+    // Sanitize each tool result part
+    const sanitizedContent = message.content.map((part) => {
+      if (part.type !== "tool-result") {
+        return part;
+      }
+
+      const result = part as { type: "tool-result"; output: unknown; [key: string]: unknown };
+
+      // Recursively serialize Error objects in output
+      const sanitizedOutput = this.serializeValue(result.output);
+
+      if (sanitizedOutput === result.output) {
+        return part;
+      }
+
+      return {
+        ...result,
+        output: sanitizedOutput,
+      };
+    });
+
+    return {
+      ...message,
+      content: sanitizedContent,
+    };
+  }
+
+  private serializeValue(value: unknown): unknown {
+    if (value === null || value === undefined) {
+      return value;
+    }
+
+    // Serialize Error objects
+    if (value instanceof Error) {
+      return {
+        __error: true,
+        name: value.name,
+        message: value.message,
+        stack: value.stack,
+      };
+    }
+
+    // Handle arrays
+    if (Array.isArray(value)) {
+      return value.map((item) => this.serializeValue(item));
+    }
+
+    // Handle plain objects
+    if (typeof value === "object" && value.constructor === Object) {
+      const result: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(value)) {
+        result[key] = this.serializeValue(val);
+      }
+      return result;
+    }
+
+    // Return primitive values as-is
+    return value;
   }
 
   addToolApprovalResponses(responses: ToolApprovalResponse[]): Message {

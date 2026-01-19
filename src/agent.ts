@@ -133,33 +133,6 @@ class AgentManager {
   }
 
   async stream(messages: ModelMessage[]) {
-    // Debug: Log messages to identify schema validation issues
-    console.error("[DEBUG] Total messages:", messages.length);
-    messages.forEach((msg, idx) => {
-      try {
-        console.error(`[DEBUG] Message ${idx}:`, {
-          role: msg.role,
-          contentType: typeof msg.content,
-          contentIsArray: Array.isArray(msg.content),
-          contentLength: Array.isArray(msg.content) ? msg.content.length : undefined,
-        });
-
-        // Log content structure for non-string content
-        if (Array.isArray(msg.content)) {
-          msg.content.forEach((part, partIdx) => {
-            console.error(`[DEBUG]   Content part ${partIdx}:`, {
-              type: part?.type,
-              hasToolCallId: 'toolCallId' in part,
-              hasApprovalId: 'approvalId' in part,
-              keys: Object.keys(part || {}),
-            });
-          });
-        }
-      } catch (error) {
-        console.error(`[DEBUG] Error logging message ${idx}:`, error);
-      }
-    });
-
     const agent = createAgent(this.modelId, {
       disableApproval: this.headlessMode,
       instructions: await this.getInstructions(),
