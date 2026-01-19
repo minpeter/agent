@@ -9,6 +9,7 @@ import {
   getIncompleteTodos,
 } from "../middleware/todo-continuation";
 import { cleanupSession } from "../tools/execute/shared-tmux-session";
+import { initializeTools } from "../utils/tools-manager";
 
 interface BaseEvent {
   timestamp: string;
@@ -253,6 +254,9 @@ const processAgentResponse = async (
 };
 
 const run = async (): Promise<void> => {
+  // Initialize required tools (ripgrep, tmux)
+  await initializeTools();
+
   const { prompt, model, thinking, toolFallback } = parseArgs();
 
   setSessionId(sessionId);

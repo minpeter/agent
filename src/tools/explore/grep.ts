@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { tool } from "ai";
 import { z } from "zod";
+import { ensureTool } from "../../utils/tools-manager";
 import { formatBlock } from "./safety-utils";
 
 const MAX_MATCHES = 20_000;
@@ -12,9 +13,16 @@ interface GrepResult {
   truncated: boolean;
 }
 
-function runRipgrep(args: string[], cwd: string): Promise<GrepResult> {
+async function runRipgrep(args: string[], cwd: string): Promise<GrepResult> {
+  const rgPath = await ensureTool("rg");
+  if (!rgPath) {
+    throw new Error(
+      "ripgrep (rg) is not available. Please install it or check your PATH."
+    );
+  }
+
   return new Promise((resolvePromise, reject) => {
-    const rg = spawn("rg", args, { cwd });
+    const rg = spawn(rgPath, args, { cwd });
 
     let stdout = "";
     let stderr = "";

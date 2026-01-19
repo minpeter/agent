@@ -27,6 +27,7 @@ import {
   getIncompleteTodos,
 } from "../middleware/todo-continuation";
 import { cleanupSession } from "../tools/execute/shared-tmux-session";
+import { initializeTools } from "../utils/tools-manager";
 
 // Bracketed paste mode escape sequences
 const PASTE_START = "\x1b[200~";
@@ -1117,6 +1118,9 @@ const collectMultilineInput = (
 };
 
 const run = async (): Promise<void> => {
+  // Initialize required tools (ripgrep, tmux)
+  await initializeTools();
+
   const sessionId = initializeSession();
   console.log(colorize("dim", `Session: ${sessionId}\n`));
 

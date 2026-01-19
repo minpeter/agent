@@ -1,5 +1,6 @@
 import { type SpawnSyncReturns, spawn, spawnSync } from "node:child_process";
 import { env } from "../../env";
+import { getToolPath } from "../../utils/tools-manager";
 import {
   formatBackgroundMessage,
   formatTerminalScreen,
@@ -57,6 +58,7 @@ function startsWithCompoundCommand(command: string): boolean {
 class SharedTmuxSession {
   private static instance: SharedTmuxSession | null = null;
   private readonly sessionId: string;
+  private readonly tmuxPath: string;
   private previousBuffer: string | null = null;
   private initialized = false;
   private destroyed = false;
@@ -64,6 +66,13 @@ class SharedTmuxSession {
 
   private constructor() {
     this.sessionId = process.env.CEA_SESSION_ID || generateSessionId();
+    const tmux = getToolPath("tmux");
+    if (!tmux) {
+      throw new Error(
+        "tmux is not installed. Please install it using your system package manager."
+      );
+    }
+    this.tmuxPath = tmux;
   }
 
   static getInstance(): SharedTmuxSession {
@@ -141,7 +150,7 @@ class SharedTmuxSession {
 
   isSessionAlive(): boolean {
     const result = this.execSync(
-      `tmux has-session -t ${this.sessionId} 2>/dev/null`
+      `${this.tmuxPath} has-session -t ${this.sessionId} 2>/dev/null`
     );
     return result.status === 0;
   }
@@ -162,8 +171,8 @@ class SharedTmuxSession {
     const startCommand = [
       "export TERM=xterm-256color",
       "export SHELL=/bin/bash",
-      `tmux new-session -x ${PANE_WIDTH} -y ${PANE_HEIGHT} -d -s ${this.sessionId} 'bash --login'`,
-      `tmux set-option -t ${this.sessionId} history-limit 50000`,
+      `${this.tmuxPath} new-session -x ${PANE_WIDTH} -y ${PANE_HEIGHT} -d -s ${this.sessionId} 'bash --login'`,
+      `${this.tmuxPath} set-option -t ${this.sessionId} history-limit 50000`,
     ].join(" && ");
 
     const result = this.execSync(startCommand);
@@ -171,7 +180,7 @@ class SharedTmuxSession {
       throw new Error(`Failed to create tmux session: ${result.stderr}`);
     }
 
-    this.execSync(`tmux send-keys -t ${this.sessionId} 'set +H' Enter`);
+    this.execSync(`${this.tmuxPath} send-keys -t ${this.sessionId} 'set +H' Enter`);
 
     this.initialized = true;
   }
@@ -217,13 +226,13 @@ class SharedTmuxSession {
     }
 
     const prepared = this.preventExecution(keys);
-    prepared.push(`; tmux wait -S ${this.sessionId}`, "Enter");
+    prepared.push(`; ${this.tmuxPath} wait -S ${this.sessionId}`, "Enter");
     return { keys: prepared, isBlocking: true };
   }
 
   private buildSendKeysCommand(keys: string[]): string {
     const escapedKeys = keys.map(escapeShellArg).join(" ");
-    return `tmux send-keys -t ${this.sessionId} ${escapedKeys}`;
+    return `${this.tmuxPath} send-keys -t ${this.sessionId} ${escapedKeys}`;
   }
 
   private async runExclusive<T>(task: () => Promise<T>): Promise<T> {
@@ -243,7 +252,7 @@ class SharedTmuxSession {
     this.execSync(sendCommand);
 
     const waitResult = await this.execAsync(
-      `tmux wait ${this.sessionId}`,
+      `${this.tmuxPath} wait ${this.sessionId}`,
       maxTimeoutMs
     );
 
@@ -300,7 +309,7 @@ class SharedTmuxSession {
     this.ensureSession();
 
     const extraArgs = captureEntire ? "-S -" : "";
-    const command = `tmux capture-pane -p ${extraArgs} -t ${this.sessionId}`;
+    const command = `${this.tmuxPath} capture-pane -p ${extraArgs} -t ${this.sessionId}`;
     const result = this.execSync(command);
     return result.stdout || "";
   }
@@ -430,7 +439,7 @@ class SharedTmuxSession {
     const wrappedCommand = [
       `echo ${startMarker};`,
       `( trap 'echo ${exitMarkerPrefix}$?__' EXIT; ${fullCommand}; ) || true;`,
-      `tmux wait -S ${waitChannel}`,
+      `${this.tmuxPath} wait -S ${waitChannel}`,
     ].join(" ");
 
     const sendCommand = this.buildSendKeysCommand([
@@ -441,7 +450,7 @@ class SharedTmuxSession {
     this.execSync(sendCommand);
 
     const waitResult = await this.execAsync(
-      `tmux wait ${waitChannel}`,
+      `${this.tmuxPath} wait ${waitChannel}`,
       timeoutMs
     );
 
@@ -544,7 +553,7 @@ class SharedTmuxSession {
     if (!this.initialized) {
       return;
     }
-    this.execSync(`tmux clear-history -t ${this.sessionId}`);
+    this.execSync(`${this.tmuxPath} clear-history -t ${this.sessionId}`);
     this.previousBuffer = null;
   }
 
@@ -569,7 +578,7 @@ class SharedTmuxSession {
         if (env.DEBUG_TMUX_CLEANUP) {
           console.error(`[DEBUG] Killing tmux session: ${this.sessionId}`);
         }
-        const result = this.execSync(`tmux kill-session -t ${this.sessionId}`);
+        const result = this.execSync(`${this.tmuxPath} kill-session -t ${this.sessionId}`);
         if (result.status !== 0) {
           console.error(
             `Warning: Failed to kill tmux session ${this.sessionId}: ${result.stderr}`
