@@ -614,6 +614,18 @@ const renderInput = (
     process.stdout.write(`${ANSI_DIM}${suggestionText}${ANSI_RESET}`);
   }
 
+  // Render suggestion list BELOW input (never above - preserves AI output)
+  const shouldShowList = shouldDisplaySuggestionList(state, cursorAtEnd);
+  let suggestionRows = 0;
+  if (shouldShowList) {
+    process.stdout.write("\n"); // Move to next line
+    suggestionRows = renderSuggestionList(state, columns);
+    // Move cursor back UP to input line (only moves within suggestion area)
+    if (suggestionRows > 0) {
+      process.stdout.write(ANSI_CURSOR_UP(suggestionRows));
+    }
+  }
+
   // Calculate cursor position within the line
   const graphemes = splitGraphemes(displayBuffer);
   const beforeCursor = graphemes.slice(0, state.cursor).join("");
