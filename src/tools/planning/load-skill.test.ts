@@ -14,7 +14,7 @@ describe("executeLoadSkill", () => {
     const result = await executeLoadSkill({ skillName: "non-existent-skill" });
 
     expect(result).toContain("Error: Skill 'non-existent-skill' not found");
-    expect(result).toContain("bundled with the package");
+    expect(result).toContain("system prompt");
   });
 
   it("loads skill with frontmatter", async () => {

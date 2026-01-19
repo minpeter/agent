@@ -180,7 +180,9 @@ class SharedTmuxSession {
       throw new Error(`Failed to create tmux session: ${result.stderr}`);
     }
 
-    this.execSync(`${this.tmuxPath} send-keys -t ${this.sessionId} 'set +H' Enter`);
+    this.execSync(
+      `${this.tmuxPath} send-keys -t ${this.sessionId} 'set +H' Enter`
+    );
 
     this.initialized = true;
   }
@@ -235,7 +237,7 @@ class SharedTmuxSession {
     return `${this.tmuxPath} send-keys -t ${this.sessionId} ${escapedKeys}`;
   }
 
-  private async runExclusive<T>(task: () => Promise<T>): Promise<T> {
+  private runExclusive<T>(task: () => Promise<T>): Promise<T> {
     const run = this.commandQueue.then(task, task);
     this.commandQueue = run.then(
       () => undefined,
@@ -515,7 +517,8 @@ class SharedTmuxSession {
       if (interactiveCheck.isBlocking) {
         return {
           exitCode: 1,
-          output: interactiveCheck.message || "Terminal is in interactive state",
+          output:
+            interactiveCheck.message || "Terminal is in interactive state",
         };
       }
 
@@ -578,7 +581,9 @@ class SharedTmuxSession {
         if (env.DEBUG_TMUX_CLEANUP) {
           console.error(`[DEBUG] Killing tmux session: ${this.sessionId}`);
         }
-        const result = this.execSync(`${this.tmuxPath} kill-session -t ${this.sessionId}`);
+        const result = this.execSync(
+          `${this.tmuxPath} kill-session -t ${this.sessionId}`
+        );
         if (result.status !== 0) {
           console.error(
             `Warning: Failed to kill tmux session ${this.sessionId}: ${result.stderr}`

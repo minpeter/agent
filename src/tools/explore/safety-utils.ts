@@ -110,7 +110,7 @@ export async function checkFileReadable(
   if (pathForIgnoreCheck && ig.ignores(pathForIgnoreCheck)) {
     return {
       allowed: false,
-      reason: `File '${filePath}' is excluded by .gitignore. Use glob with respect_git_ignore: false if you need to access it.`,
+      reason: `File '${filePath}' is excluded by .gitignore. Use glob_files with respect_git_ignore: false if you need to access it.`,
     };
   }
 

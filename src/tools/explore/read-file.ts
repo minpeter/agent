@@ -75,7 +75,7 @@ export const readFileTool = tool({
   description:
     "Read file contents with line numbers. " +
     "ALWAYS read before editing. " +
-    "Use around_line for smart reading (grep result → read around match).",
+    "Use around_line for smart reading (grep_files result → read around match).",
   inputSchema,
   execute: executeReadFile,
 });

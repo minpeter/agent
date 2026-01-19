@@ -14,6 +14,8 @@ import { finished } from "node:stream/promises";
 import { colorize } from "../interaction/colors";
 
 const TOOLS_DIR = join(homedir(), ".cea", "bin");
+const VERSION_PREFIX_REGEX = /^v/;
+const ARCHIVE_EXTENSION_REGEX = /\.(tar\.gz|zip)$/;
 
 interface ToolConfig {
   name: string;
@@ -81,7 +83,9 @@ function commandExists(cmd: string): boolean {
  */
 export function getToolPath(tool: "rg" | "tmux"): string | null {
   const config = TOOLS[tool];
-  if (!config) return null;
+  if (!config) {
+    return null;
+  }
 
   // Check our tools directory first
   const localPath = join(
@@ -116,7 +120,7 @@ async function getLatestVersion(repo: string): Promise<string> {
   }
 
   const data = (await response.json()) as { tag_name: string };
-  return data.tag_name.replace(/^v/, "");
+  return data.tag_name.replace(VERSION_PREFIX_REGEX, "");
 }
 
 /**
@@ -134,7 +138,9 @@ async function downloadFile(url: string, dest: string): Promise<void> {
   }
 
   const fileStream = createWriteStream(dest);
-  await finished(Readable.fromWeb(response.body as any).pipe(fileStream));
+  // Type assertion needed because fetch's ReadableStream is from web API
+  // @ts-expect-error - Type mismatch between web ReadableStream and node stream/web ReadableStream
+  await finished(Readable.fromWeb(response.body).pipe(fileStream));
 }
 
 /**
@@ -142,7 +148,9 @@ async function downloadFile(url: string, dest: string): Promise<void> {
  */
 async function downloadTool(tool: "rg"): Promise<string> {
   const config = TOOLS[tool];
-  if (!config) throw new Error(`Unknown tool: ${tool}`);
+  if (!config) {
+    throw new Error(`Unknown tool: ${tool}`);
+  }
   if (!config.installable) {
     throw new Error(`Tool ${config.name} cannot be auto-installed`);
   }
@@ -188,7 +196,7 @@ async function downloadTool(tool: "rg"): Promise<string> {
     // Find the binary in extracted files
     const extractedDir = join(
       extractDir,
-      assetName.replace(/\.(tar\.gz|zip)$/, "")
+      assetName.replace(ARCHIVE_EXTENSION_REGEX, "")
     );
     const extractedBinary = join(extractedDir, config.binaryName + binaryExt);
 
@@ -212,60 +220,53 @@ async function downloadTool(tool: "rg"): Promise<string> {
 }
 
 /**
- * Ensure a tool is available, downloading if necessary
- * Returns the path to the tool, or null if unavailable
+ * Show installation instructions for a non-installable tool
  */
-export async function ensureTool(
-  tool: "rg" | "tmux",
-  silent = false
+function showInstallInstructions(config: ToolConfig, silent: boolean): void {
+  if (silent) {
+    return;
+  }
+
+  console.error(
+    colorize(
+      "yellow",
+      `${config.name} is not installed. Please install it using your system package manager:`
+    )
+  );
+
+  const plat = platform();
+  if (plat === "darwin") {
+    console.error(colorize("dim", `  brew install ${config.name}`));
+  } else if (plat === "linux") {
+    console.error(
+      colorize("dim", `  apt install ${config.name}  # Debian/Ubuntu`)
+    );
+    console.error(
+      colorize("dim", `  yum install ${config.name}  # RHEL/CentOS`)
+    );
+  } else if (plat === "win32") {
+    console.error(
+      colorize("dim", `  choco install ${config.name}  # Chocolatey`)
+    );
+  }
+}
+
+/**
+ * Attempt to download and install a tool
+ */
+async function attemptToolDownload(
+  tool: "rg",
+  config: ToolConfig,
+  silent: boolean
 ): Promise<string | undefined> {
-  const existingPath = getToolPath(tool);
-  if (existingPath) {
-    return existingPath;
-  }
-
-  const config = TOOLS[tool];
-  if (!config) return undefined;
-
-  // For non-installable tools, show installation instructions
-  if (!config.installable) {
-    if (!silent) {
-      console.error(
-        colorize(
-          "yellow",
-          `${config.name} is not installed. Please install it using your system package manager:`
-        )
-      );
-      const plat = platform();
-      if (plat === "darwin") {
-        console.error(colorize("dim", `  brew install ${config.name}`));
-      } else if (plat === "linux") {
-        console.error(
-          colorize("dim", `  apt install ${config.name}  # Debian/Ubuntu`)
-        );
-        console.error(
-          colorize("dim", `  yum install ${config.name}  # RHEL/CentOS`)
-        );
-      } else if (plat === "win32") {
-        console.error(
-          colorize("dim", `  choco install ${config.name}  # Chocolatey`)
-        );
-      }
-    }
-    return undefined;
-  }
-
-  // Tool not found - download it
   if (!silent) {
     console.error(colorize("dim", `${config.name} not found. Downloading...`));
   }
 
   try {
-    const path = await downloadTool(tool as "rg");
+    const path = await downloadTool(tool);
     if (!silent) {
-      console.error(
-        colorize("dim", `${config.name} installed to ${path}`)
-      );
+      console.error(colorize("dim", `${config.name} installed to ${path}`));
     }
     return path;
   } catch (e) {
@@ -279,6 +280,34 @@ export async function ensureTool(
     }
     return undefined;
   }
+}
+
+/**
+ * Ensure a tool is available, downloading if necessary
+ * Returns the path to the tool, or null if unavailable
+ */
+export async function ensureTool(
+  tool: "rg" | "tmux",
+  silent = false
+): Promise<string | undefined> {
+  const existingPath = getToolPath(tool);
+  if (existingPath) {
+    return existingPath;
+  }
+
+  const config = TOOLS[tool];
+  if (!config) {
+    return undefined;
+  }
+
+  // For non-installable tools, show installation instructions
+  if (!config.installable) {
+    showInstallInstructions(config, silent);
+    return undefined;
+  }
+
+  // Tool not found - download it
+  return await attemptToolDownload(tool as "rg", config, silent);
 }
 
 /**
@@ -306,15 +335,22 @@ export async function initializeTools(): Promise<void> {
   if (missingTools.length > 0) {
     console.error("");
     console.error(
-      colorize("red", "ERROR: Required tools are missing and could not be installed automatically.")
+      colorize(
+        "red",
+        "ERROR: Required tools are missing and could not be installed automatically."
+      )
     );
     console.error("");
-    console.error(colorize("dim", "The following tools are required for this CLI to work:"));
+    console.error(
+      colorize("dim", "The following tools are required for this CLI to work:")
+    );
     for (const tool of missingTools) {
       console.error(colorize("yellow", `  - ${tool}`));
     }
     console.error("");
-    console.error(colorize("dim", "Please install the missing tools and try again."));
+    console.error(
+      colorize("dim", "Please install the missing tools and try again.")
+    );
     console.error("");
     process.exit(1);
   }

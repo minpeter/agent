@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 const ESC = "\x1b";
 const BRACKETED_PASTE_START = "\x1b[200~";
 const BRACKETED_PASTE_END = "\x1b[201~";
+const NUMERIC_REGEX = /^\d+$/;
 
 type SequenceStatus = "complete" | "incomplete" | "not-escape";
 
@@ -47,7 +48,7 @@ const isCompleteCsiSequence = (data: string): "complete" | "incomplete" => {
     return "incomplete";
   }
   const payload = data.slice(2);
-  const lastChar = payload[payload.length - 1];
+  const lastChar = payload.at(-1);
   if (!lastChar) {
     return "incomplete";
   }
@@ -55,7 +56,7 @@ const isCompleteCsiSequence = (data: string): "complete" | "incomplete" => {
   if (lastCode >= 0x40 && lastCode <= 0x7e) {
     if (payload.startsWith("<") && (lastChar === "m" || lastChar === "M")) {
       const params = payload.slice(1, -1).split(";");
-      const allNumeric = params.every((param) => /^\d+$/.test(param));
+      const allNumeric = params.every((param) => NUMERIC_REGEX.test(param));
       return allNumeric ? "complete" : "incomplete";
     }
     return "complete";
@@ -124,9 +125,9 @@ const extractCompleteSequences = (
   return { sequences, remainder: "" };
 };
 
-export type StdinBufferOptions = {
+export interface StdinBufferOptions {
   timeout?: number;
-};
+}
 
 export class StdinBuffer extends EventEmitter {
   private buffer = "";
@@ -140,83 +141,75 @@ export class StdinBuffer extends EventEmitter {
     this.timeoutMs = options.timeout ?? 10;
   }
 
-  public process(data: string | Buffer): void {
-    if (this.timeout) {
-      clearTimeout(this.timeout);
-      this.timeout = null;
+  private convertBufferToString(data: string | Buffer): string {
+    if (!Buffer.isBuffer(data)) {
+      return data;
     }
 
-    let str: string;
-    if (Buffer.isBuffer(data)) {
-      if (data.length === 1 && data[0] !== undefined && data[0] > 127) {
-        const byte = data[0] - 128;
-        str = `\x1b${String.fromCharCode(byte)}`;
-      } else {
-        str = data.toString();
-      }
-    } else {
-      str = data;
+    if (data.length === 1 && data[0] !== undefined && data[0] > 127) {
+      const byte = data[0] - 128;
+      return `\x1b${String.fromCharCode(byte)}`;
     }
 
-    if (str.length === 0 && this.buffer.length === 0) {
-      this.emit("data", "");
+    return data.toString();
+  }
+
+  private processPasteModeBuffer(): void {
+    this.pasteBuffer += this.buffer;
+    this.buffer = "";
+    const endIndex = this.pasteBuffer.indexOf(BRACKETED_PASTE_END);
+
+    if (endIndex === -1) {
       return;
     }
 
-    this.buffer += str;
+    const pastedContent = this.pasteBuffer.slice(0, endIndex);
+    const remaining = this.pasteBuffer.slice(
+      endIndex + BRACKETED_PASTE_END.length
+    );
+    this.pasteMode = false;
+    this.pasteBuffer = "";
+    this.emit("paste", pastedContent);
 
-    if (this.pasteMode) {
-      this.pasteBuffer += this.buffer;
-      this.buffer = "";
-      const endIndex = this.pasteBuffer.indexOf(BRACKETED_PASTE_END);
-      if (endIndex !== -1) {
-        const pastedContent = this.pasteBuffer.slice(0, endIndex);
-        const remaining = this.pasteBuffer.slice(
-          endIndex + BRACKETED_PASTE_END.length
-        );
-        this.pasteMode = false;
-        this.pasteBuffer = "";
-        this.emit("paste", pastedContent);
-        if (remaining.length > 0) {
-          this.process(remaining);
-        }
+    if (remaining.length > 0) {
+      this.process(remaining);
+    }
+  }
+
+  private handleBracketedPasteStart(startIndex: number): void {
+    if (startIndex > 0) {
+      const beforePaste = this.buffer.slice(0, startIndex);
+      const result = extractCompleteSequences(beforePaste);
+      for (const sequence of result.sequences) {
+        this.emit("data", sequence);
       }
-      return;
     }
 
-    const startIndex = this.buffer.indexOf(BRACKETED_PASTE_START);
-    if (startIndex !== -1) {
-      if (startIndex > 0) {
-        const beforePaste = this.buffer.slice(0, startIndex);
-        const result = extractCompleteSequences(beforePaste);
-        for (const sequence of result.sequences) {
-          this.emit("data", sequence);
-        }
-      }
-      this.buffer = this.buffer.slice(
-        startIndex + BRACKETED_PASTE_START.length
+    this.buffer = this.buffer.slice(startIndex + BRACKETED_PASTE_START.length);
+    this.pasteMode = true;
+    this.pasteBuffer = this.buffer;
+    this.buffer = "";
+
+    const endIndex = this.pasteBuffer.indexOf(BRACKETED_PASTE_END);
+    if (endIndex !== -1) {
+      const pastedContent = this.pasteBuffer.slice(0, endIndex);
+      const remaining = this.pasteBuffer.slice(
+        endIndex + BRACKETED_PASTE_END.length
       );
-      this.pasteMode = true;
-      this.pasteBuffer = this.buffer;
-      this.buffer = "";
-      const endIndex = this.pasteBuffer.indexOf(BRACKETED_PASTE_END);
-      if (endIndex !== -1) {
-        const pastedContent = this.pasteBuffer.slice(0, endIndex);
-        const remaining = this.pasteBuffer.slice(
-          endIndex + BRACKETED_PASTE_END.length
-        );
-        this.pasteMode = false;
-        this.pasteBuffer = "";
-        this.emit("paste", pastedContent);
-        if (remaining.length > 0) {
-          this.process(remaining);
-        }
-      }
-      return;
-    }
+      this.pasteMode = false;
+      this.pasteBuffer = "";
+      this.emit("paste", pastedContent);
 
+      if (remaining.length > 0) {
+        this.process(remaining);
+      }
+    }
+  }
+
+  private processNormalInput(): void {
     const result = extractCompleteSequences(this.buffer);
     this.buffer = result.remainder;
+
     for (const sequence of result.sequences) {
       this.emit("data", sequence);
     }
@@ -231,7 +224,36 @@ export class StdinBuffer extends EventEmitter {
     }
   }
 
-  public flush(): string[] {
+  process(data: string | Buffer): void {
+    if (this.timeout) {
+      clearTimeout(this.timeout);
+      this.timeout = null;
+    }
+
+    const str = this.convertBufferToString(data);
+
+    if (str.length === 0 && this.buffer.length === 0) {
+      this.emit("data", "");
+      return;
+    }
+
+    this.buffer += str;
+
+    if (this.pasteMode) {
+      this.processPasteModeBuffer();
+      return;
+    }
+
+    const startIndex = this.buffer.indexOf(BRACKETED_PASTE_START);
+    if (startIndex !== -1) {
+      this.handleBracketedPasteStart(startIndex);
+      return;
+    }
+
+    this.processNormalInput();
+  }
+
+  flush(): string[] {
     if (this.timeout) {
       clearTimeout(this.timeout);
       this.timeout = null;
@@ -244,7 +266,7 @@ export class StdinBuffer extends EventEmitter {
     return sequences;
   }
 
-  public clear(): void {
+  clear(): void {
     if (this.timeout) {
       clearTimeout(this.timeout);
       this.timeout = null;
@@ -254,11 +276,11 @@ export class StdinBuffer extends EventEmitter {
     this.pasteBuffer = "";
   }
 
-  public getBuffer(): string {
+  getBuffer(): string {
     return this.buffer;
   }
 
-  public destroy(): void {
+  destroy(): void {
     this.clear();
   }
 }

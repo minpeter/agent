@@ -33,8 +33,8 @@ This skill provides comprehensive guidance for git operations, branch management
 
 - `shell_execute` - Execute git and gh CLI commands
 - `read_file` - Read git config, commit messages, PR templates
-- `grep` - Search for patterns in git history
-- `glob` - Find git-related files
+- `grep_files` - Search for patterns in git history
+- `glob_files` - Find git-related files
 
 ## Git Command Reference
 

@@ -2,7 +2,7 @@
 
 import type { Interface as ReadlineInterface } from "node:readline";
 import { createInterface } from "node:readline";
-import * as nodeUtil from "node:util";
+import { stripVTControlCharacters } from "node:util";
 import { agentManager } from "../agent";
 import {
   executeCommand,
@@ -182,13 +182,21 @@ const WHITESPACE_REGEX = /\s/;
 const ZERO_WIDTH_CODEPOINTS = new Set([0x20_0d, 0xfe_0e, 0xfe_0f]);
 
 const stripVtControlCharacters =
-  typeof nodeUtil.stripVTControlCharacters === "function"
-    ? nodeUtil.stripVTControlCharacters
+  typeof stripVTControlCharacters === "function"
+    ? stripVTControlCharacters
     : null;
-const getNodeStringWidth =
-  typeof (nodeUtil as any).getStringWidth === "function"
-    ? (nodeUtil as any).getStringWidth
-    : null;
+
+// Try to get getStringWidth from node:util if available
+// This is an experimental feature, so we check for it at runtime
+let getNodeStringWidth: ((str: string) => number) | null = null;
+try {
+  const nodeUtil = require("node:util");
+  if (typeof nodeUtil.getStringWidth === "function") {
+    getNodeStringWidth = nodeUtil.getStringWidth;
+  }
+} catch {
+  // getStringWidth not available
+}
 
 const graphemeSegmenter =
   typeof Intl !== "undefined" && "Segmenter" in Intl
@@ -271,29 +279,27 @@ const normalizeLineEndings = (input: string): string =>
   input.replace(LINE_ENDING_REGEX, "\n");
 
 const isCombiningCodePoint = (codePoint: number): boolean =>
-  (codePoint >= 0x0300 && codePoint <= 0x036f) ||
-  (codePoint >= 0x1ab0 && codePoint <= 0x1aff) ||
-  (codePoint >= 0x1dc0 && codePoint <= 0x1dff) ||
-  (codePoint >= 0x20d0 && codePoint <= 0x20ff) ||
-  (codePoint >= 0xfe20 && codePoint <= 0xfe2f);
+  (codePoint >= 0x03_00 && codePoint <= 0x03_6f) ||
+  (codePoint >= 0x1a_b0 && codePoint <= 0x1a_ff) ||
+  (codePoint >= 0x1d_c0 && codePoint <= 0x1d_ff) ||
+  (codePoint >= 0x20_d0 && codePoint <= 0x20_ff) ||
+  (codePoint >= 0xfe_20 && codePoint <= 0xfe_2f);
 
 const isFullwidthCodePoint = (codePoint: number): boolean =>
-  codePoint >= 0x1100 &&
-  (codePoint <= 0x115f ||
-    codePoint === 0x2329 ||
-    codePoint === 0x232a ||
-    (codePoint >= 0x2e80 &&
-      codePoint <= 0xa4cf &&
-      codePoint !== 0x303f) ||
-    (codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
-    (codePoint >= 0xf900 && codePoint <= 0xfaff) ||
-    (codePoint >= 0xfe10 && codePoint <= 0xfe19) ||
-    (codePoint >= 0xfe30 && codePoint <= 0xfe6f) ||
-    (codePoint >= 0xff00 && codePoint <= 0xff60) ||
-    (codePoint >= 0xffe0 && codePoint <= 0xffe6) ||
-    (codePoint >= 0x1f300 && codePoint <= 0x1f64f) ||
-    (codePoint >= 0x1f900 && codePoint <= 0x1f9ff) ||
-    (codePoint >= 0x20000 && codePoint <= 0x3fffd));
+  codePoint >= 0x11_00 &&
+  (codePoint <= 0x11_5f ||
+    codePoint === 0x23_29 ||
+    codePoint === 0x23_2a ||
+    (codePoint >= 0x2e_80 && codePoint <= 0xa4_cf && codePoint !== 0x30_3f) ||
+    (codePoint >= 0xac_00 && codePoint <= 0xd7_a3) ||
+    (codePoint >= 0xf9_00 && codePoint <= 0xfa_ff) ||
+    (codePoint >= 0xfe_10 && codePoint <= 0xfe_19) ||
+    (codePoint >= 0xfe_30 && codePoint <= 0xfe_6f) ||
+    (codePoint >= 0xff_00 && codePoint <= 0xff_60) ||
+    (codePoint >= 0xff_e0 && codePoint <= 0xff_e6) ||
+    (codePoint >= 0x1_f3_00 && codePoint <= 0x1_f6_4f) ||
+    (codePoint >= 0x1_f9_00 && codePoint <= 0x1_f9_ff) ||
+    (codePoint >= 0x2_00_00 && codePoint <= 0x3_ff_fd));
 
 const getCodePointWidth = (char: string): number => {
   const codePoint = char.codePointAt(0);
@@ -785,7 +791,9 @@ const getCommandSuggestions = (buffer: string): string[] => {
 
   if (spaceIndex === -1) {
     // No space: suggest command names
-    const commandNames = Array.from(commandMap.keys()).map((name) => `/${name}`);
+    const commandNames = Array.from(commandMap.keys()).map(
+      (name) => `/${name}`
+    );
 
     // If the buffer is exactly "/", return all commands
     if (buffer === "/") {
@@ -805,7 +813,7 @@ const getCommandSuggestions = (buffer: string): string[] => {
   const argPart = buffer.slice(spaceIndex + 1); // Get argument part
 
   const command = commandMap.get(commandName);
-  if (!command || !command.argumentSuggestions) {
+  if (!command?.argumentSuggestions) {
     return [];
   }
 
@@ -1006,6 +1014,35 @@ const collectMultilineInput = (
       return null;
     };
 
+    const handleTabCompletion = (): void => {
+      if (state.suggestions.length === 0) {
+        return;
+      }
+
+      const currentMatchIndex = state.suggestions.indexOf(state.buffer);
+      const isExactMatch = currentMatchIndex !== -1;
+      const hasMultipleSuggestions = state.suggestions.length > 1;
+      const cursorAtEnd = state.cursor === splitGraphemes(state.buffer).length;
+
+      if (isExactMatch && hasMultipleSuggestions && cursorAtEnd) {
+        // Cycle to the next suggestion
+        state.suggestionIndex =
+          (currentMatchIndex + 1) % state.suggestions.length;
+        const nextSuggestion = state.suggestions[state.suggestionIndex];
+        state.buffer = nextSuggestion;
+        state.cursor = splitGraphemes(nextSuggestion).length;
+        updateSuggestions(state);
+        render();
+      } else if (state.suggestionIndex < state.suggestions.length) {
+        // Complete with the current suggestion
+        const suggestion = state.suggestions[state.suggestionIndex];
+        state.buffer = suggestion;
+        state.cursor = splitGraphemes(suggestion).length;
+        updateSuggestions(state);
+        render();
+      }
+    };
+
     const controlHandlers = new Map<number, () => InputAction | null>([
       [CTRL_C, () => "cancel"],
       [
@@ -1035,37 +1072,8 @@ const collectMultilineInput = (
         return handler();
       }
 
-      // Handle Tab key for autocomplete
       if (code === TAB) {
-        if (state.suggestions.length > 0) {
-          // Check if current buffer exactly matches a suggestion
-          const currentMatchIndex = state.suggestions.findIndex(
-            (s) => s === state.buffer
-          );
-
-          if (
-            currentMatchIndex !== -1 &&
-            state.suggestions.length > 1 &&
-            state.cursor === splitGraphemes(state.buffer).length
-          ) {
-            // Current buffer matches a suggestion and there are multiple suggestions
-            // Cycle to the next suggestion
-            state.suggestionIndex =
-              (currentMatchIndex + 1) % state.suggestions.length;
-            const nextSuggestion = state.suggestions[state.suggestionIndex];
-            state.buffer = nextSuggestion;
-            state.cursor = splitGraphemes(nextSuggestion).length;
-            updateSuggestions(state);
-            render();
-          } else if (state.suggestionIndex < state.suggestions.length) {
-            // Complete with the current suggestion
-            const suggestion = state.suggestions[state.suggestionIndex];
-            state.buffer = suggestion;
-            state.cursor = splitGraphemes(suggestion).length;
-            updateSuggestions(state);
-            render();
-          }
-        }
+        handleTabCompletion();
         return null;
       }
 

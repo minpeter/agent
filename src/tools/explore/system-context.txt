@@ -12,7 +12,7 @@ Use these tools to understand the codebase before making changes.
 
 **Example**: `read_file("src/config.ts")`
 
-### glob
+### glob_files
 **Purpose**: Find files matching patterns
 
 **When to use**:
@@ -22,9 +22,9 @@ Use these tools to understand the codebase before making changes.
 
 **DO NOT use shell commands**: Use this instead of `find`, `ls`, or `tree`
 
-**Example**: `glob("**/*.test.ts")` finds all test files
+**Example**: `glob_files("**/*.test.ts")` finds all test files
 
-### grep
+### grep_files
 **Purpose**: Search file contents for patterns (supports regex)
 
 **When to use**:
@@ -34,4 +34,4 @@ Use these tools to understand the codebase before making changes.
 
 **DO NOT use shell commands**: Use this instead of `grep`, `rg`, or `ag`
 
-**Example**: `grep("function.*calculate", "src/**/*.ts")` finds all calculate functions
+**Example**: `grep_files("function.*calculate", "src/**/*.ts")` finds all calculate functions

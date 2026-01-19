@@ -16,8 +16,8 @@ export const tools = {
   edit_file: editFileTool,
   read_file: readFileTool,
   delete_file: deleteFileTool,
-  glob: globTool,
-  grep: grepTool,
+  glob_files: globTool,
+  grep_files: grepTool,
   load_skill: loadSkillTool,
   todo_write: todoWriteTool,
 } as const;
