@@ -57,7 +57,7 @@ let rlInstance: ReadlineInterface | null = null;
 let shouldExit = false;
 let cachedSkills: SkillInfo[] = [];
 const commandHistory: string[] = []; // Store command history
-let historyIndex = -1; // Current position in history (-1 = not browsing)
+const historyIndex = -1; // Current position in history (-1 = not browsing)
 
 const TODO_CONTINUATION_MAX_LOOPS = 5;
 
@@ -1184,16 +1184,13 @@ const collectMultilineInput = (
               (state.suggestionIndex + 1) % state.suggestions.length;
           } else if (state.historyIndex !== -1) {
             // Navigate command history
-            console.log(`[DEBUG] Down pressed, current index: ${state.historyIndex}`);
             if (state.historyIndex < commandHistory.length - 1) {
               state.historyIndex++;
               state.buffer = commandHistory[state.historyIndex];
-              console.log(`[DEBUG] Loaded history[${state.historyIndex}]: "${state.buffer}"`);
             } else {
               // Reached end of history - restore original input
               state.historyIndex = -1;
               state.buffer = state.originalBuffer;
-              console.log(`[DEBUG] Restored original buffer: "${state.buffer}"`);
             }
             state.cursor = splitGraphemes(state.buffer).length;
           }
@@ -1427,11 +1424,12 @@ const run = async (): Promise<void> => {
       const trimmed = input.trim();
 
       // Add to history (all inputs, not just commands)
-      if (trimmed.length > 0) {
-        if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== trimmed) {
-          commandHistory.push(trimmed);
-          console.log(`[DEBUG] Added to history: "${trimmed}", total: ${commandHistory.length}`);
-        }
+      if (
+        trimmed.length > 0 &&
+        (commandHistory.length === 0 ||
+          commandHistory[commandHistory.length - 1] !== trimmed)
+      ) {
+        commandHistory.push(trimmed);
       }
 
       if (shouldExitFromInput(trimmed)) {
