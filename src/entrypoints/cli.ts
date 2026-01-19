@@ -3,6 +3,7 @@
 import type { Interface as ReadlineInterface } from "node:readline";
 import { createInterface } from "node:readline";
 import { stripVTControlCharacters } from "node:util";
+import type { ProviderType } from "../agent";
 import { agentManager } from "../agent";
 import {
   executeCommand,
@@ -100,11 +101,13 @@ const parseCliArgs = (): {
   thinking: boolean;
   toolFallback: boolean;
   model: string | null;
+  provider: ProviderType | null;
 } => {
   const args = process.argv.slice(2);
   let thinking = false;
   let toolFallback = false;
   let model: string | null = null;
+  let provider: ProviderType | null = null;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -115,10 +118,16 @@ const parseCliArgs = (): {
     } else if (arg === "--model" && i + 1 < args.length) {
       model = args[i + 1];
       i++;
+    } else if (arg === "--provider" && i + 1 < args.length) {
+      const providerArg = args[i + 1];
+      if (providerArg === "anthropic" || providerArg === "friendli") {
+        provider = providerArg;
+      }
+      i++;
     }
   }
 
-  return { thinking, toolFallback, model };
+  return { thinking, toolFallback, model, provider };
 };
 
 const handleGracefulShutdown = () => {
@@ -1343,9 +1352,12 @@ const run = async (): Promise<void> => {
   const sessionId = initializeSession();
   console.log(colorize("dim", `Session: ${sessionId}\n`));
 
-  const { thinking, toolFallback, model } = parseCliArgs();
+  const { thinking, toolFallback, model, provider } = parseCliArgs();
   agentManager.setThinkingEnabled(thinking);
   agentManager.setToolFallbackEnabled(toolFallback);
+  if (provider) {
+    agentManager.setProvider(provider);
+  }
   if (model) {
     agentManager.setModelId(model);
   }

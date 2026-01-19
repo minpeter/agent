@@ -1,4 +1,5 @@
-import { agentManager } from "../agent";
+import type { ProviderType } from "../agent";
+import { ANTHROPIC_MODELS, agentManager } from "../agent";
 import { env } from "../env";
 import { colorize } from "../interaction/colors";
 import { Spinner } from "../interaction/spinner";
@@ -9,6 +10,7 @@ interface ModelInfo {
   name?: string;
   type?: "serverless" | "dedicated";
   status?: string;
+  provider: ProviderType;
 }
 
 interface DedicatedEndpointData {
@@ -29,7 +31,19 @@ const VALID_DEDICATED_STATUSES = [
   "READY",
 ] as const;
 
+function getAnthropicModels(): ModelInfo[] {
+  return ANTHROPIC_MODELS.map((m) => ({
+    id: m.id,
+    name: m.name,
+    provider: "anthropic" as const,
+  }));
+}
+
 async function fetchServerlessModels(): Promise<ModelInfo[]> {
+  if (!env.FRIENDLI_TOKEN) {
+    return [];
+  }
+
   const response = await fetch("https://api.friendli.ai/serverless/v1/models", {
     headers: {
       Authorization: `Bearer ${env.FRIENDLI_TOKEN}`,
@@ -41,10 +55,18 @@ async function fetchServerlessModels(): Promise<ModelInfo[]> {
   }
 
   const data = (await response.json()) as { data: { id: string }[] };
-  return data.data.map((m) => ({ id: m.id, type: "serverless" as const }));
+  return data.data.map((m) => ({
+    id: m.id,
+    type: "serverless" as const,
+    provider: "friendli" as const,
+  }));
 }
 
 async function fetchDedicatedEndpoints(): Promise<ModelInfo[]> {
+  if (!env.FRIENDLI_TOKEN) {
+    return [];
+  }
+
   try {
     const allEndpoints: ModelInfo[] = [];
     let cursor: string | null = null;
@@ -81,6 +103,7 @@ async function fetchDedicatedEndpoints(): Promise<ModelInfo[]> {
           id,
           type: "dedicated" as const,
           status: endpoint.status,
+          provider: "friendli" as const,
         }));
 
       allEndpoints.push(...endpoints);
@@ -98,25 +121,43 @@ async function fetchAvailableModels(): Promise<ModelInfo[]> {
     return cachedModels;
   }
 
+  const anthropicModels = env.ANTHROPIC_API_KEY ? getAnthropicModels() : [];
+
   const [serverlessModels, dedicatedEndpoints] = await Promise.all([
     fetchServerlessModels(),
     fetchDedicatedEndpoints(),
   ]);
 
-  cachedModels = [...serverlessModels, ...dedicatedEndpoints];
+  cachedModels = [
+    ...anthropicModels,
+    ...serverlessModels,
+    ...dedicatedEndpoints,
+  ];
   return cachedModels;
 }
 
-function formatModelList(models: ModelInfo[], currentModelId: string): string {
+function formatModelList(
+  models: ModelInfo[],
+  currentModelId: string,
+  currentProvider: ProviderType
+): string {
   const lines = models.map((model, index) => {
-    const isCurrent = model.id === currentModelId;
+    const isCurrent =
+      model.id === currentModelId && model.provider === currentProvider;
     const marker = isCurrent ? colorize("green", " (current)") : "";
-    const typeLabel =
-      model.type === "dedicated" ? colorize("cyan", " [FDE]") : "";
+    let providerLabel: string;
+    if (model.provider === "anthropic") {
+      providerLabel = colorize("magenta", " [Anthropic]");
+    } else if (model.type === "dedicated") {
+      providerLabel = colorize("cyan", " [FDE]");
+    } else {
+      providerLabel = colorize("blue", " [FriendliAI]");
+    }
     const statusLabel = model.status
       ? colorize("yellow", ` (${model.status})`)
       : "";
-    return `  ${index + 1}. ${model.id}${typeLabel}${statusLabel}${marker}`;
+    const nameLabel = model.name ? ` - ${model.name}` : "";
+    return `  ${index + 1}. ${model.id}${nameLabel}${providerLabel}${statusLabel}${marker}`;
   });
 
   return `Available models:\n${lines.join("\n")}\n\nUsage: /model <number> to select`;
@@ -138,11 +179,12 @@ export const createModelCommand = (): Command => ({
       }
 
       const currentModelId = agentManager.getModelId();
+      const currentProvider = agentManager.getProvider();
 
       if (args.length === 0) {
         return {
           success: true,
-          message: formatModelList(models, currentModelId),
+          message: formatModelList(models, currentModelId, currentProvider),
         };
       }
 
@@ -168,18 +210,34 @@ export const createModelCommand = (): Command => ({
         };
       }
 
-      if (selectedModel.id === currentModelId) {
+      if (
+        selectedModel.id === currentModelId &&
+        selectedModel.provider === currentProvider
+      ) {
         return {
           success: true,
           message: `Already using model: ${selectedModel.id}`,
         };
       }
 
+      // Set provider first (this will also set a default model for the provider)
+      if (selectedModel.provider !== currentProvider) {
+        agentManager.setProvider(selectedModel.provider);
+      }
+      // Then set the specific model
       agentManager.setModelId(selectedModel.id);
-      agentManager.setModelType(selectedModel.type || "serverless");
+      if (selectedModel.type) {
+        agentManager.setModelType(selectedModel.type);
+      }
+
+      const providerLabel =
+        selectedModel.provider === "anthropic" ? "Anthropic" : "FriendliAI";
       return {
         success: true,
-        message: colorize("green", `Model changed to: ${selectedModel.id}`),
+        message: colorize(
+          "green",
+          `Model changed to: ${selectedModel.id} (${providerLabel})`
+        ),
       };
     } catch (error) {
       spinner.stop();
